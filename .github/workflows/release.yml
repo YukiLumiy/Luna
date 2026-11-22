@@ -22,12 +22,14 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      # pnpm-workspace.yaml uses a newer pnpm's settings (allowBuilds), which pnpm 9 rejects
+      # ("packages field missing or empty"), so use the current pnpm.
       - uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: latest
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
       - uses: dtolnay/rust-toolchain@stable
       - uses: swatinem/rust-cache@v2
