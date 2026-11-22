@@ -5,8 +5,16 @@ export interface ProtocolStatus {
   can_restore: boolean;
 }
 
+/** What `apply_mods_and_launch` returns (see launch.rs). */
+export interface LaunchResult {
+  version_folder: string;
+  files_applied: number;
+  files_restored: number;
+  cache_cleared: boolean;
+}
+
 export const api = {
-  launch: () => invoke<unknown>("apply_mods_and_launch"),
+  launch: () => invoke<LaunchResult>("apply_mods_and_launch"),
   protocolStatus: () => invoke<ProtocolStatus>("get_protocol_status"),
 };
 

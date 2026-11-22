@@ -24,9 +24,10 @@ export function LaunchScreen() {
     setStatus("starting");
     setMessage("");
     try {
-      const folder = await api.launch();
+      const result = await api.launch();
       setStatus("running");
-      setMessage(folder);
+      // show the Roblox version folder's name (e.g. version-1a2b3c...), not the whole path
+      setMessage(result.version_folder.split(/[\\/]/).pop() ?? "");
     } catch (e) {
       setStatus("idle");
       setMessage(errText(e));
