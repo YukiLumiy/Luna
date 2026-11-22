@@ -1,5 +1,5 @@
 /**
- * The moon rising on the horizon, ringed by slowly turning dotted halos.
+ * The moon rising on the horizon (in the light theme, a sun), ringed by slowly turning dotted halos.
  * The moon itself is low-poly: a disc cut into flat triangles, each shaded by
  * how much it faces the light (upper left). While the pointer is over it (or the
  * Launch / Settings buttons) HeroBackground adds `hero--spin`: the moon takes one
@@ -97,6 +97,8 @@ export function MoonEmblem({ busy = false }: { busy?: boolean }) {
       </svg>
       <div className="disc-pos">
         <div className="disc">
+          {/* the light theme shows a sun instead of the moon (see "Light theme" in components.css) */}
+          <div className="disc-sun" />
           <svg viewBox="0 0 100 100" aria-hidden>
             {POLYS.map((p, i) => (
               <polygon key={i} points={p.points} style={{ fill: p.color, stroke: p.color }} strokeWidth="0.35" strokeLinejoin="round" />

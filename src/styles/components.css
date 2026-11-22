@@ -81,6 +81,7 @@
         .disc-pos { position: absolute; left: 50%; top: 100%; width: 47.14%; aspect-ratio: 1; transform: translate(-50%, -50%); }
         .disc { position: relative; width: 100%; height: 100%; filter: drop-shadow(0 0 12px var(--moon-glow)); }
         .disc svg { display: block; width: 100%; height: 100%; }
+        .disc-sun { display: none; position: absolute; inset: 0; border-radius: 50%; background: linear-gradient(0deg, #ff7a59, #ffe0a8); }
         .hero--spin .disc { animation: luna-turn 2600ms cubic-bezier(0.45, 0.05, 0.25, 1); }
         @keyframes luna-turn { to { transform: rotate(360deg); } }
         .moon-pulse { position: absolute; left: 50%; top: 100%; width: 47%; aspect-ratio: 1; border-radius: 50%; border: 2px solid var(--halo); transform: translate(-50%, -50%) scale(1); opacity: 0.7; animation: moon-pulse 1800ms ease-out infinite; pointer-events: none; }
@@ -173,11 +174,9 @@
           margin-bottom: 14px;
           transition: border-color 160ms ease, transform 160ms ease, scale 460ms var(--spring), box-shadow 260ms ease;
         }
+        /* The panel under the pointer grows a little. It is the pointer that does it, not focus:
+           pressing a button, box or switch inside a panel (which focuses it) changes nothing. */
         .appearance-block:hover {
-          border-color: var(--line-strong);
-        }
-        /* The panel being worked in grows a little. */
-        .appearance-block:focus-within {
           scale: 1.018;
           position: relative;
           z-index: 2;
@@ -843,29 +842,46 @@
       
 
 /* ---- theme / layout extras ---- */
-/* Light theme: the sky half of the Launch screen stays a night sky, so the stars, shooting
-   stars, moon, rings and horizon line keep the contrast they were drawn with. Only the
-   scene's own variables are redefined; the buttons and title below the horizon stay light. */
+/* Light theme: a day scene. The sky is white with a sun rising on the horizon (the disc the dark
+   theme draws as a moon), and the lower half — plain white before — is the theme colour. The title,
+   status text and footer pill turn white to sit on it, and the Launch button turns white. */
 :root[data-theme="light"] .hero {
   background: linear-gradient(180deg,
-    var(--bg-canvas) 0%,
-    color-mix(in srgb, var(--bg-canvas) 62%, var(--night-horizon)) 6%,
-    color-mix(in srgb, var(--night-horizon) 62%, var(--night-top)) 13%,
-    color-mix(in srgb, var(--night-low) 70%, var(--night-top)) 21%,
-    var(--night-top) 32%,
-    var(--night-mid) 44%,
-    var(--night-horizon) 50%,
-    var(--ground) 50%, var(--ground-deep) 100%);
+    var(--bg-canvas) 0%, #ffffff 24%, #ffffff 44%,
+    #fff1e6 50%,
+    var(--moon) 50%, var(--moon-dark) 100%);
 }
-:root[data-theme="light"] .hero::before { display: none; } /* the light sky already starts from the window colour */
-:root[data-theme="light"] :is(.hero-sky, .hero-stars) {
-  --stars: 0.9;
-  --hero-line: var(--night-line);
-  --halo: var(--night-line);
-  --glow: var(--night-glow);
-  --moon-glow: var(--night-moon-glow);
-  --moon-glow-mid: var(--night-moon-glow-mid);
+:root[data-theme="light"] .hero::before { display: none; }
+:root[data-theme="light"] :is(.hero-stars, .shoot) { display: none; }
+:root[data-theme="light"] .hero-sky {
+  --hero-line: var(--moon);
+  --halo: #ff9a5c;
+  --moon-glow: rgba(255, 122, 89, 0.5);
+  --moon-glow-mid: rgba(255, 150, 100, 0.12);
 }
+:root[data-theme="light"] .disc svg { display: none; }
+:root[data-theme="light"] .disc-sun { display: block; }
+:root[data-theme="light"] .disc { filter: drop-shadow(0 0 16px rgba(255, 130, 90, 0.55)); }
+:root[data-theme="light"] :is(.hero-water, .footer) {
+  --ink: #ffffff;
+  --ink-muted: rgba(255, 255, 255, 0.84);
+  --ink-faint: rgba(255, 255, 255, 0.62);
+  --moon-gradient: linear-gradient(180deg, #ffffff 0%, #f1f2f8 100%);
+  --ink-on-moon: var(--moon-dark);
+  --moon-text: #ffffff;
+  --glow: rgba(255, 255, 255, 0.55);
+  --btn-drop: 0 10px 18px rgba(0, 0, 0, 0.2);
+  --reflect: rgba(255, 255, 255, 0.85);
+  --bg-surface: rgba(255, 255, 255, 0.18);
+  --line: rgba(255, 255, 255, 0.34);
+  --line-strong: rgba(255, 255, 255, 0.5);
+  color: #ffffff;
+}
+:root[data-theme="light"] .luna-btn-sheen { background: color-mix(in srgb, var(--moon) 16%, transparent); }
+:root[data-theme="light"] .luna-spinner { border-color: color-mix(in srgb, var(--moon) 25%, transparent); border-top-color: var(--moon-dark); }
+/* the footer pill sits over the coloured ground instead of under it */
+:root[data-theme="light"] .screen { position: relative; }
+:root[data-theme="light"] .footer { position: absolute; left: 0; right: 0; bottom: 0; padding: 0 0 12px; }
 
 /* Content fades out under the title bar and at the window's bottom edge instead
    of being cut by a hard line while scrolling. Eased stops avoid a visible band. */
