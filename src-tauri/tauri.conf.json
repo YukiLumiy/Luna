@@ -53,7 +53,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEZFNkJCRTY5MjQwMkY2OUEKUldTYTlnSWthYjVyL2dPNWtZOExlMFp6ZEtIckloTVN6UFp6cmRGN0hLSnBYaUlOUGV3Y25URmIK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDIxNzAxNjI4OUNDNkMzMkEKUldRcXc4YWNLQlp3SVZxREkxc1FDU0RQdkw4TTNUN3VVM0pldElUcUVRLzlEamdaRjlMWkdPT2IK",
       "endpoints": [
         "https://github.com/YukiLumiy/Luna/releases/latest/download/latest.json"
       ],
