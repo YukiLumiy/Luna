@@ -1,0 +1,183 @@
+/* Luna — a moonlit sky over a horizon. Luna's layout, with the ember light
+   swapped for moonlight. Dark pink (default) and pale pink (light). */
+:root {
+  --bg-canvas: #1c0d17;
+  --bg-surface: #2a1423;
+  --bg-surface-hover: #3b1b30;
+  --line: rgba(255, 170, 205, 0.13);
+  --line-strong: rgba(255, 170, 205, 0.28);
+  --ink: #ffeef6;
+  --ink-muted: #cfa3b8;
+  --ink-faint: #94687f;
+  --accent-live: #8fe3b0;
+  --danger: #ff8fa0;
+  /* moon ramp — highlight → shadow */
+  --moon-hi: #fff5fa;
+  --moon-light: #ffd3e6;
+  --moon: #f59cc4;
+  --moon-dark: #d9729f;
+  --moon-gradient: linear-gradient(180deg, #ffc9e0 0%, #f08ab8 100%);
+  --glow: rgba(255, 150, 200, 0.42);
+  --glow-soft: rgba(255, 150, 200, 0.16);
+  --ink-on-moon: #2a0b1c;
+  --moon-text: #ffb8d6;
+  /* the sky scene on the Launch screen */
+  --sky-top: #14070f;
+  --sky-mid: #230d1d;
+  --sky-low: #411634;
+  --horizon: #8a3d6e;
+  --ground: #10060d;
+  --ground-deep: #1c0d17;
+  --font-display: "Inter", "Segoe UI", "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", "Yu Gothic UI", sans-serif;
+  --font-body: "Inter", "Segoe UI", "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", "Yu Gothic UI", sans-serif;
+  --radius-pill: 999px;
+  --radius-md: 14px;
+  --radius-window: 20px;
+  /* Dusk's component names, mapped onto the moon ramp */
+  --ember-hi: var(--moon-hi);
+  --ember-light: var(--moon-light);
+  --ember: var(--moon);
+  --ember-dark: var(--moon-dark);
+  --ember-deep: #b0507f;
+  --ember-gradient: var(--moon-gradient);
+  --ember-text: var(--moon-text);
+  --ink-on-ember: var(--ink-on-moon);
+  --ink-on-light: var(--ink-on-moon);
+  --poly-clip-sm: inset(0 round 12px);
+  --poly-clip-hex: inset(0 round 12px);
+  --hex-line: transparent;
+  --stars: 0.9;
+  /* the scene on the Launch screen */
+  --hero-line: #ffc2de;
+  --halo: #ffc2de;
+  --reflect: #ff9fc9;
+  --moon-glow: rgba(255, 170, 210, 0.5);
+  --moon-glow-mid: rgba(240, 140, 190, 0.1);
+  --disc-shadow: inset -10px -12px 24px rgba(110, 40, 80, 0.35);
+  --danger-bg: #3a1a28;
+  --btn-drop: 0 4px 0 rgba(0, 0, 0, 0.3);
+  --spring: linear(0, 0.0284, 0.1028, 0.2081, 0.3311, 0.4609, 0.5888, 0.7083, 0.8149, 0.906, 0.9803, 1.0377, 1.0794, 1.1066, 1.1216, 1.1263, 1.123, 1.1139, 1.1007, 1.0852, 1.0689, 1.0527, 1.0375, 1.024, 1.0124, 1.0029, 0.9955, 0.9902, 0.9867, 0.9847, 0.984, 0.9844, 0.9855, 0.9872, 0.9891, 0.9912, 0.9933, 0.9952, 0.9969, 0.9984, 1);
+  --noise: none;
+  /* the two colours the low-poly moon is shaded between */
+  --moon-lit: #fff6fa;
+  --moon-shade: #be8ca8;
+  color-scheme: dark;
+}
+
+/* Light — clean off-white, white cards with soft shadows, a deeper indigo accent. */
+:root[data-theme="light"] {
+  --bg-canvas: #fdf1f6;
+  --bg-surface: #ffffff;
+  --bg-surface-hover: #fbe4ee;
+  --line: rgba(120, 30, 70, 0.09);
+  --line-strong: rgba(120, 30, 70, 0.17);
+  --ink: #34121f;
+  --ink-muted: #84566a;
+  --ink-faint: #b08a9c;
+  --accent-live: #2e9a5c;
+  --danger: #d23a55;
+  --danger-bg: #fde4e9;
+  --moon-hi: #ffffff;
+  --moon-light: #ffa9cb;
+  --moon: #f06fa3;
+  --moon-dark: #d9508a;
+  --moon-gradient: linear-gradient(180deg, #fb8fba 0%, #e8588f 100%);
+  --moon-text: #c93b7a;
+  --ink-on-moon: #ffffff;
+  --glow: rgba(240, 100, 160, 0.34);
+  --glow-soft: rgba(240, 100, 160, 0.14);
+  --sky-top: #fdf1f6;
+  --sky-mid: #fbe0ec;
+  --sky-low: #fdeef5;
+  --horizon: #f6c3d8;
+  --ground: #fff6fa;
+  --ground-deep: #fdf1f6;
+  --stars: 0;
+  --hero-line: #e0629a;
+  --halo: #e0629a;
+  --reflect: #ee7fae;
+  --moon-glow: rgba(235, 110, 165, 0.3);
+  --moon-glow-mid: rgba(235, 120, 170, 0.06);
+  --disc-shadow: inset -9px -11px 22px rgba(150, 50, 100, 0.25), 0 14px 34px -8px rgba(232, 88, 143, 0.4);
+  --btn-drop: 0 10px 14px rgba(232, 88, 143, 0.3);
+  color-scheme: light;
+}
+:root[data-theme="light"] .appearance-block { box-shadow: 0 1px 2px rgba(20, 25, 70, 0.05), 0 12px 28px -16px rgba(20, 25, 70, 0.2); border-color: transparent; }
+
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; margin: 0; background: transparent; }
+
+body {
+  color: var(--ink);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+  user-select: none;
+}
+
+button { font-family: inherit; cursor: pointer; }
+
+@keyframes reveal-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(0.8); }
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}
+
+/* Slim scrollbar, no arrows, a moon-coloured thumb that wakes on hover. */
+::-webkit-scrollbar { width: 12px; height: 12px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--moon) 30%, transparent);
+  border: 3px solid transparent; background-clip: padding-box; border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--moon) 58%, transparent); background-clip: padding-box; }
+::-webkit-scrollbar-button { display: none; }
+
+/* A small moon dot in front of card headings (Dusk's hexagon, as a moon). */
+.appearance-block > h3::before {
+  content: ""; display: inline-block; width: 9px; height: 10px; margin-right: 8px;
+  background: var(--ember-gradient); border-radius: 50%; filter: drop-shadow(0 0 4px var(--glow));
+}
+/* Settings cards arrive one after another. */
+.appearance-block { animation: reveal-up 520ms cubic-bezier(0.16, 1, 0.3, 1) backwards; }
+.appearance-block:nth-of-type(2) { animation-delay: 70ms; }
+.appearance-block:nth-of-type(3) { animation-delay: 140ms; }
+.appearance-block:nth-of-type(4) { animation-delay: 210ms; }
+.appearance-block:nth-of-type(5) { animation-delay: 280ms; }
+.appearance-block:nth-of-type(n + 6) { animation-delay: 340ms; }
+
+/* Korean: Pretendard (same family feel as Inter, designed for Hangul UI). */
+:root[lang="ko"] {
+  --font-display: "Pretendard Variable", "Pretendard", "Inter", "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  --font-body: "Pretendard Variable", "Pretendard", "Inter", "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+}
+:root[lang="ko"] body { letter-spacing: -0.012em; }
+
+/* ---------- layout safety (English / Korean, slow loads, odd data) ---------- */
+
+/* Long words, paths and error messages wrap instead of widening a panel.
+   Korean breaks between words, not in the middle of one. */
+.appearance-hint, .appearance-status, .flag-error, .field-label, .settings-empty, .settings-error,
+.welcome-status, .server-result-line, .server-result-meta { overflow-wrap: anywhere; min-width: 0; }
+:lang(ko) .appearance-hint, :lang(ko) .appearance-status, :lang(ko) .flag-error, :lang(ko) .field-label,
+:lang(ko) .welcome-status, :lang(ko) .settings-empty { word-break: keep-all; }
+
+/* In the Settings column nothing may be squeezed to fit: the list scrolls instead. */
+.settings > * { flex-shrink: 0; }
+.settings { overflow-x: hidden; }
+
+/* Buttons keep their shape in any language. */
+.apply-btn, .reset-btn, .theme-option, .picker-btn-tag, .icon-btn-text { white-space: nowrap; }
+
+/* The two-option language switch uses the theme switch's sliding pill. */
+.theme-switch[data-active="ko"]::before { transform: translateX(100%); }

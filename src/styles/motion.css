@@ -1,0 +1,61 @@
+/* =====================================================================
+   Focus / hover motion
+   ===================================================================== */
+
+/* Every button swells slightly when hovered or keyboard-focused and springs back
+   when it lets go. The swell uses the `scale` property so it combines with any
+   transform a button already has (press squeeze, lift). */
+button { --swell: 1.06; }
+button:not(:disabled) {
+  transition:
+    scale 460ms var(--spring),
+    transform 200ms ease,
+    background-color 160ms ease,
+    color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 200ms ease,
+    filter 160ms ease,
+    opacity 160ms ease;
+}
+button:not(:disabled):is(:hover, :focus-visible) { scale: var(--swell); }
+
+/* Small controls can afford more; wide ones would crowd their neighbours. */
+.titlebar-btn, .back-btn, .icon-btn, .toggle { --swell: 1.14; }
+.luna-btn--primary, .apply-btn--full, .picker-btn, .sky-templates-head { --swell: 1.025; }
+.apply-btn, .theme-tile, .theme-option { --swell: 1.04; }
+.luna-btn--secondary { --swell: 1.08; }
+
+/* ---- Sky templates: the one the pointer last touched stays grown and the others stay
+   slightly smaller for as long as the pointer is anywhere over the grid. ----
+   The state comes from AppearanceSection (sky-template--hot / --dim, set on pointer-enter or
+   focus, cleared only when the pointer or focus leaves the whole grid). It used to be pure CSS
+   (:has(:hover)), so crossing the 8px gap between two thumbnails dropped every one of them
+   back to full size for a moment and made the whole grid jump. */
+.sky-templates-grid {
+  /* room for the grown thumbnail so the scrolling box never clips it */
+  padding: 12px 10px; margin: -6px -8px; max-height: 244px;
+}
+.sky-template { --swell: 1; position: relative; transition: scale 420ms var(--spring), opacity 200ms ease; }
+.sky-template.sky-template--hot:not(:disabled) { scale: 1.14; z-index: 2; }
+.sky-template.sky-template--dim:not(:disabled) { scale: 0.93; }
+.sky-template img { box-shadow: 0 0 0 rgba(0, 0, 0, 0); transition: outline-color 140ms ease, filter 140ms ease, box-shadow 260ms ease; }
+.sky-template.sky-template--hot:not(:disabled) img { box-shadow: 0 10px 22px -8px rgba(0, 0, 0, 0.55); transform: none; }
+
+/* ---- Text boxes: the frame slides in when one is clicked into ----
+   The ring starts inside the box, invisible, and eases out to just outside the border while
+   it fades in; the border itself takes the accent colour with a soft halo. */
+.flag-input, .profile-rename {
+  outline: 2px solid transparent;
+  outline-offset: -6px;
+  transition:
+    outline-color 220ms ease-out,
+    outline-offset 380ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 220ms ease-out,
+    box-shadow 380ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.flag-input:focus, .profile-rename:focus {
+  outline-color: color-mix(in srgb, var(--ember) 80%, transparent);
+  outline-offset: 1px;
+  border-color: var(--ember);
+  box-shadow: 0 0 0 5px var(--glow-soft);
+}

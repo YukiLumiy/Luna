@@ -1,0 +1,48 @@
+# タグ (v0.1.1 など) を push すると、Windows 用インストーラをビルド・署名して
+# GitHub Releases に公開し、アプリの自動更新が読む latest.json も一緒に出します。
+#
+# 事前準備 (一度だけ):
+#   1. npm run tauri signer generate -- -w %USERPROFILE%\.tauri\luna.key
+#   2. node scripts/setup-updater.mjs OWNER/REPO      (公開鍵と更新先を tauri.conf.json に書く)
+#   3. リポジトリの Settings → Secrets and variables → Actions に登録:
+#        TAURI_SIGNING_PRIVATE_KEY           luna.key の中身
+#        TAURI_SIGNING_PRIVATE_KEY_PASSWORD  鍵のパスワード (空なら空文字)
+#   4. Settings → Actions → General → Workflow permissions を "Read and write" にする
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: pnpm install --frozen-lockfile
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: Luna ${{ github.ref_name }}
+          releaseBody: See the assets to download and install.
+          releaseDraft: false
+          prerelease: false
+          includeUpdaterJson: true
