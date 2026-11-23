@@ -97,17 +97,6 @@ export const ko: Record<keyof typeof en, string> = {
   "update.startupToggle": "시작 시 업데이트 확인 켜기/끄기",
 
   // skybox fix
-  "skyfix.heading": "스카이박스 수정",
-  "skyfix.hint": "Roblox 캐시에 있는 기본 하늘 텍스처를 교체해, 직접 만든 스카이박스가 표시되게 합니다.",
-  "skyfix.all": "적용됨 — 파일 {total}개가 모두 있습니다.",
-  "skyfix.partial": "일부만 적용됨 — {total}개 중 {present}개.",
-  "skyfix.none": "적용되지 않음.",
-  "skyfix.applyBtn": "수정 적용",
-  "skyfix.applied": "파일 {n}개를 적용했습니다.",
-  "skyfix.removed": "파일 {n}개를 제거했습니다.",
-  "skyfix.onLaunch": "실행할 때마다 적용",
-  "skyfix.onLaunchHint": "캐시를 삭제하면 수정이 사라지므로, Roblox가 시작되기 직전에 다시 적용합니다.",
-  "skyfix.onLaunchToggle": "실행 시 스카이박스 수정 적용 켜기/끄기",
 
   // fastflag presets
   "presets.heading": "FastFlag 프리셋",

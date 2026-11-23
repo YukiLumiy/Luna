@@ -5,7 +5,7 @@
 //! with the files built into Luna, so no batch file or console window is needed.
 
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 
@@ -80,12 +80,26 @@ pub(crate) fn apply() -> Result<usize, String> {
     }
 }
 
-/// Deletes the replacement files so Roblox downloads the originals again.
+/// Keeps the fix in step with the skybox, and is called whenever that may have changed:
+/// a skybox was applied, reset, switched on or off, or Roblox is about to start. If any
+/// enabled profile carries sky faces the fix is put in place (without it Roblox keeps its
+/// cached default sky and ignores the replacement); otherwise it is taken out again so
+/// Roblox uses its own sky. Best effort — a locked file must never get in the way.
+pub(crate) fn sync_with_skybox(mods_root: &Path) {
+    if crate::sky::profiles_with_sky(mods_root).is_empty() {
+        let _ = remove();
+    } else {
+        let _ = apply();
+    }
+}
+
+/// Deletes the replacement files so Roblox downloads the originals again. Only files that
+/// are really ours (same bytes) are touched.
 pub(crate) fn remove() -> Result<usize, String> {
     let mut removed = 0;
     for name in NAMES {
         let path = target(name)?;
-        if path.is_file() {
+        if path.is_file() && fs::read(&path).map(|d| d == DATA).unwrap_or(false) {
             set_readonly(&path, false);
             fs::remove_file(&path).map_err(|e| format!("Couldn't delete {}: {e}", path.display()))?;
             removed += 1;

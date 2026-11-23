@@ -176,6 +176,7 @@ pub fn apply_user_sky_preset(app_handle: tauri::AppHandle, name: String) -> Resu
         return Err("That saved skybox has no faces".into());
     }
     let _ = update_settings(settings);
+    crate::skyfix::sync_with_skybox(&root);
     Ok(name)
 }
 

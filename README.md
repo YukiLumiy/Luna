@@ -9,7 +9,7 @@ pnpm tauri dev
 
 ## 現在のステップ
 - UI は Dusk のものを月光カラーに改変（400x560 固定ウィンドウ）
-- Settings は Dusk のものをそのまま配置（Appearance / Updates / Skybox fix / FastFlags / Advanced / Mod profiles など）
+- Settings は Dusk のものをそのまま配置（Appearance / Updates / FastFlags / Advanced / Mod profiles など）
 - バックエンドも Dusk のモジュールを Luna 名義（%LOCALAPPDATA%\Luna\state）で配置
 - 効果音は削除。UI は英語 / 韓国語（Settings → Advanced → Language。src/locales/en.ts と ko.ts は同じキーが必須で、足りないと型エラー）
 - フォント: 英語は Inter、韓国語は Pretendard（可変フォント）
@@ -41,3 +41,4 @@ tauri.conf.json の updater の endpoints は YukiLumiy/Luna を仮置きして�
 - ライトテーマはダークの場面の明暗を反転（淡い空・暗い月・暗い星。ウィンドウのタブも）。パネルはホバーしても拡大しない
 - 削除の「Delete?」は useArmed.ts（別の場所をクリック / Esc / 数秒で × に戻る）。ツールチップは TooltipLayer.tsx（title 属性を自動で置き換え）。アップデート通知は UpdateToast.tsx、更新後の初回だけ PatchNotes.tsx（本文は RELEASE_NOTES.md がリリース本文になる）
 - 色は `tools/genpal.py` で生成（palettes.css）。色を足す・調整するときはここの表を編集して実行
+- Skybox fix は設定画面から削除。スカイボックスの適用・リセット・プロファイルの ON/OFF/削除・Roblox 起動のたびに skyfix::sync_with_skybox が自動で適用/解除（スカイボックスを持つ有効なプロファイルがあれば適用、なければ解除）

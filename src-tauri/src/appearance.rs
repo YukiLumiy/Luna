@@ -139,6 +139,7 @@ pub fn install_skybox_mod(
     }
 
     let _ = update_settings(settings);
+    crate::skyfix::sync_with_skybox(&root); // a new skybox needs the fix to show
 
     Ok(written)
 }
@@ -169,6 +170,7 @@ pub fn install_sky_preset(app_handle: tauri::AppHandle, slug: String) -> Result<
         settings.active_sky_faces.insert(key.to_string(), preset.name.to_string());
     }
     let _ = update_settings(settings);
+    crate::skyfix::sync_with_skybox(&root);
     Ok(preset.name.to_string())
 }
 
@@ -221,5 +223,8 @@ pub fn reset_appearance(app_handle: tauri::AppHandle, kind: String) -> Result<Ve
         settings.active_sky_faces.clear();
     }
     let _ = update_settings(settings);
+    if kind == "skybox" {
+        crate::skyfix::sync_with_skybox(&root); // no skybox left: Roblox's own sky again
+    }
     Ok(turned_off)
 }

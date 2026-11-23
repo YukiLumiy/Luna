@@ -66,10 +66,11 @@ pub(crate) fn launch_roblox(
         let _ = crate::recache::restore_if_empty();
     }
 
-    // The cache clear above also deletes the skybox fix files, so put them
-    // back. A failure is ignored: it must never block the launch.
-    if get_settings().map(|s| s.skybox_fix_on_launch).unwrap_or(false) {
-        let _ = crate::skyfix::apply();
+    // The skybox fix goes in whenever a skybox is active (the cache clear above would have
+    // deleted it, so this is every launch) and comes out when none is. Failures are ignored:
+    // they must never block the launch.
+    if let Ok(root) = crate::mods::mods_root(app_handle) {
+        crate::skyfix::sync_with_skybox(&root);
     }
 
     let exe = version_folder.join("RobloxPlayerBeta.exe");

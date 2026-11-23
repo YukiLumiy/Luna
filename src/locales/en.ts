@@ -95,17 +95,6 @@ export const en = {
   "update.startupToggle": "Toggle checking for updates on startup",
 
   // skybox fix
-  "skyfix.heading": "Skybox fix",
-  "skyfix.hint": "Replaces Roblox's cached default sky textures so your custom skybox is the one that shows.",
-  "skyfix.all": "Applied — all {total} files are in place.",
-  "skyfix.partial": "Partly applied — {present} of {total} files.",
-  "skyfix.none": "Not applied.",
-  "skyfix.applyBtn": "Apply fix",
-  "skyfix.applied": "Applied {n} {n?file|files}.",
-  "skyfix.removed": "Removed {n} {n?file|files}.",
-  "skyfix.onLaunch": "Apply on every launch",
-  "skyfix.onLaunchHint": "Clearing the cache removes the fix, so this puts it back just before Roblox starts.",
-  "skyfix.onLaunchToggle": "Toggle applying the skybox fix on launch",
 
   // fastflag presets
   "presets.heading": "FastFlag presets",

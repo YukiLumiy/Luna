@@ -324,6 +324,8 @@ pub fn set_mod_profile_enabled(
         }
         fs::rename(current, target).map_err(|e| e.to_string())?;
     }
+    // Switching a profile that carries a skybox on or off changes whether the fix is needed.
+    crate::skyfix::sync_with_skybox(&root);
     Ok(())
 }
 
@@ -435,6 +437,7 @@ pub fn delete_mod_profile(app_handle: tauri::AppHandle, name: String) -> Result<
     let root = mods_root(&app_handle)?;
     delete_profile_in(&root, &name)?;
     forget_appearance_state(&name);
+    crate::skyfix::sync_with_skybox(&root);
     Ok(())
 }
 

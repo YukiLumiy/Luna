@@ -4,7 +4,6 @@ import { ToggleSwitch } from "./ToggleSwitch";
 import { useT } from "../i18n";
 import { AppearanceSection } from "./AppearanceSection";
 import { FastFlagsSection } from "./FastFlagsSection";
-import { SkyboxFixSection } from "./SkyboxFixSection";
 import { RecacheSection } from "./RecacheSection";
 import { UpdateSection } from "./UpdateSection";
 import { FFlagPresetsSection } from "./FFlagPresetsSection";
@@ -128,7 +127,6 @@ export function SettingsScreen({ onBack, onProfilesChanged }: SettingsScreenProp
 
       <AppearanceSection syncKey={appearanceKey} onApplied={refresh} />
       <UpdateSection />
-      <SkyboxFixSection />
       <RecacheSection />
       <FFlagPresetsSection />
       <FastFlagsSection />
