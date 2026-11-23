@@ -40,7 +40,7 @@ export function UpdateSection() {
             <button
               className="apply-btn apply-btn--full"
               disabled={s.kind === "checking" || s.kind === "downloading"}
-              onClick={checkForUpdate}
+              onClick={() => void checkForUpdate()}
             >
               {t("update.check")}
             </button>

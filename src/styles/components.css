@@ -910,7 +910,8 @@
 
 /* ---- UpdateToast.tsx: top-right update notice ---- */
 .update-toast {
-  position: fixed; top: 48px; right: 12px; z-index: 900; width: 244px;
+  /* across the top of the home screen, a little narrower than the window */
+  position: fixed; top: 48px; left: 12px; right: 12px; z-index: 900;
   display: flex; flex-direction: column; gap: 10px; padding: 12px 14px;
   background: var(--bg-surface); color: var(--ink);
   border: 1px solid var(--line-strong); border-radius: 16px;

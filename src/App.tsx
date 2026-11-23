@@ -93,7 +93,8 @@ export default function App() {
   return (
     <div className="app">
       <TitleBar />
-      <UpdateToast />
+      {/* home screen only — Settings has its own Updates card */}
+      {view === "home" && <UpdateToast />}
       <TooltipLayer />
       {notes && <PatchNotes version={notes.version} notes={notes.notes} onClose={() => setNotes(null)} />}
 
@@ -127,4 +128,3 @@ export default function App() {
     </div>
   );
 }
-
