@@ -54,7 +54,7 @@ export function HeroBackground({ sky, children }: HeroBackgroundProps) {
     <div ref={root} className={`hero ${spin ? "hero--spin" : ""}`} onPointerOver={onOver} onAnimationEnd={onEnd} onPointerMove={onMove}>
       <svg className="hero-stars" viewBox="0 0 400 200" preserveAspectRatio="xMidYMin slice" aria-hidden>
         {STARS.map((st, i) => (
-          <circle key={i} className="star" cx={st.x} cy={st.y} r={st.r} fill="#f1f4ff"
+          <circle key={i} className="star" cx={st.x} cy={st.y} r={st.r} fill="var(--star)"
             style={{ "--o": st.o, animationDelay: `${st.d}s`, animationDuration: `${st.t}s` } as CSSProperties} />
         ))}
       </svg>

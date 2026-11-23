@@ -47,7 +47,7 @@
         @keyframes star-twinkle { 0%, 100% { opacity: var(--o); } 50% { opacity: calc(var(--o) * 0.3); } }
         .hero-sky { position: relative; display: flex; align-items: flex-end; justify-content: center; color: var(--hero-line); }
         .hero-sky::after { content: ""; position: absolute; left: 8%; right: 8%; bottom: -1px; height: 1px; background: linear-gradient(90deg, transparent, currentColor, transparent); opacity: 0.8; }
-        .shoot { position: absolute; left: 14%; top: 12%; width: 84px; height: 1.5px; opacity: 0; pointer-events: none; background: linear-gradient(90deg, transparent, #fff); animation: shoot 6.5s linear infinite 1s; }
+        .shoot { position: absolute; left: 14%; top: 12%; width: 84px; height: 1.5px; opacity: 0; pointer-events: none; background: linear-gradient(90deg, transparent, var(--star)); animation: shoot 6.5s linear infinite 1s; }
         .shoot--b { left: 56%; top: 24%; animation-delay: 4.2s; }
         @keyframes shoot {
           0% { transform: translate(0, 0) rotate(24deg); opacity: 0; }
@@ -81,7 +81,6 @@
         .disc-pos { position: absolute; left: 50%; top: 100%; width: 47.14%; aspect-ratio: 1; transform: translate(-50%, -50%); }
         .disc { position: relative; width: 100%; height: 100%; filter: drop-shadow(0 0 12px var(--moon-glow)); }
         .disc svg { display: block; width: 100%; height: 100%; }
-        .disc-sun { display: none; position: absolute; inset: 0; border-radius: 50%; background: linear-gradient(0deg, #ff7a59, #ffe0a8); }
         .hero--spin .disc { animation: luna-turn 2600ms cubic-bezier(0.45, 0.05, 0.25, 1); }
         @keyframes luna-turn { to { transform: rotate(360deg); } }
         .moon-pulse { position: absolute; left: 50%; top: 100%; width: 47%; aspect-ratio: 1; border-radius: 50%; border: 2px solid var(--halo); transform: translate(-50%, -50%) scale(1); opacity: 0.7; animation: moon-pulse 1800ms ease-out infinite; pointer-events: none; }
@@ -172,17 +171,9 @@
           border-radius: var(--radius-md);
           padding: 14px;
           margin-bottom: 14px;
-          transition: border-color 160ms ease, transform 160ms ease, scale 460ms var(--spring), box-shadow 260ms ease;
+          transition: border-color 160ms ease;
         }
-        /* The panel under the pointer grows a little. It is the pointer that does it, not focus:
-           pressing a button, box or switch inside a panel (which focuses it) changes nothing. */
-        .appearance-block:hover {
-          scale: 1.018;
-          position: relative;
-          z-index: 2;
-          border-color: var(--line-strong);
-          box-shadow: 0 14px 30px -18px rgba(0, 0, 0, 0.55), 0 0 0 1px var(--glow-soft);
-        }
+        .appearance-block:hover { border-color: var(--line-strong); }
         .appearance-block h3 {
           margin: 0 0 4px;
           font-size: 13.5px;
@@ -288,9 +279,7 @@
           flex: 1;
         }
         .sky-templates {
-          margin-top: 14px;
-          padding-top: 10px;
-          border-top: 1px solid var(--line);
+          margin-top: 8px;
         }
         .sky-templates-head {
           display: flex;
@@ -322,6 +311,11 @@
           max-height: 218px;
           overflow-y: auto;
           padding: 2px 4px 2px 2px;
+          scrollbar-width: thin;
+          scrollbar-color: var(--line-strong) transparent;
+          /* the scrolled-away rows fade out at both ends instead of being cut off by a hard edge */
+          -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 14px, #000 calc(100% - 18px), transparent 100%);
+          mask-image: linear-gradient(to bottom, transparent 0, #000 14px, #000 calc(100% - 18px), transparent 100%);
         }
         .sky-template {
           display: flex;
@@ -433,11 +427,25 @@
           color: var(--ember-text);
           font-size: 10px;
         }
-        .appearance-status {
-          margin: 10px 0 0;
-          font-size: 11.5px;
-          color: var(--ink-muted);
+        /* Status line under a button row (StatusLine.tsx): a clear gap from the buttons, and it
+           opens/closes smoothly (grid rows 0fr -> 1fr) rather than popping in. */
+        .status-line {
+          display: grid;
+          grid-template-rows: 0fr;
+          margin-top: 0;
+          transition: grid-template-rows 280ms cubic-bezier(0.16, 1, 0.3, 1), margin-top 280ms cubic-bezier(0.16, 1, 0.3, 1);
         }
+        .status-line--open { grid-template-rows: 1fr; margin-top: 12px; }
+        .status-text {
+          min-height: 0;
+          margin: 0;
+          overflow: hidden;
+          font-size: 11.5px;
+          line-height: 1.55;
+          color: var(--ink-muted);
+          overflow-wrap: anywhere;
+        }
+        .status-text--error { color: var(--danger); }
       
 
 /* ---- FFlagPresetsSection.tsx ---- */
@@ -572,8 +580,15 @@
       
 
 /* ---- FFlagProfilesSection.tsx ---- */
-        .profile-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; }
-        .profile-actions { display: flex; gap: 6px; }
+        .fprofile-list { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+        .fprofile-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 8px 8px 12px; background: var(--bg-canvas); border: 1px solid var(--line); border-radius: 13px; }
+        .fprofile-name { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 6px; font-size: 12.5px; font-weight: 600; }
+        .fprofile-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .fprofile-count { flex: none; font-size: 11px; font-weight: 500; color: var(--ink-faint); }
+        .fprofile-actions { flex: none; display: flex; gap: 6px; }
+        .fprofile-actions .apply-btn { min-width: 64px; }
+        .apply-btn--danger, .reset-btn--danger { color: var(--danger); border-color: var(--danger); }
+        .flag-reset-all { width: 100%; margin: 10px 0 14px; }
       
 
 /* ---- AdvancedSection.tsx ---- */
@@ -842,46 +857,10 @@
       
 
 /* ---- theme / layout extras ---- */
-/* Light theme: a day scene. The sky is white with a sun rising on the horizon (the disc the dark
-   theme draws as a moon), and the lower half — plain white before — is the theme colour. The title,
-   status text and footer pill turn white to sit on it, and the Launch button turns white. */
-:root[data-theme="light"] .hero {
-  background: linear-gradient(180deg,
-    var(--bg-canvas) 0%, #ffffff 24%, #ffffff 44%,
-    #fff1e6 50%,
-    var(--moon) 50%, var(--moon-dark) 100%);
-}
-:root[data-theme="light"] .hero::before { display: none; }
-:root[data-theme="light"] :is(.hero-stars, .shoot) { display: none; }
-:root[data-theme="light"] .hero-sky {
-  --hero-line: var(--moon);
-  --halo: #ff9a5c;
-  --moon-glow: rgba(255, 122, 89, 0.5);
-  --moon-glow-mid: rgba(255, 150, 100, 0.12);
-}
-:root[data-theme="light"] .disc svg { display: none; }
-:root[data-theme="light"] .disc-sun { display: block; }
-:root[data-theme="light"] .disc { filter: drop-shadow(0 0 16px rgba(255, 130, 90, 0.55)); }
-:root[data-theme="light"] :is(.hero-water, .footer) {
-  --ink: #ffffff;
-  --ink-muted: rgba(255, 255, 255, 0.84);
-  --ink-faint: rgba(255, 255, 255, 0.62);
-  --moon-gradient: linear-gradient(180deg, #ffffff 0%, #f1f2f8 100%);
-  --ink-on-moon: var(--moon-dark);
-  --moon-text: #ffffff;
-  --glow: rgba(255, 255, 255, 0.55);
-  --btn-drop: 0 10px 18px rgba(0, 0, 0, 0.2);
-  --reflect: rgba(255, 255, 255, 0.85);
-  --bg-surface: rgba(255, 255, 255, 0.18);
-  --line: rgba(255, 255, 255, 0.34);
-  --line-strong: rgba(255, 255, 255, 0.5);
-  color: #ffffff;
-}
-:root[data-theme="light"] .luna-btn-sheen { background: color-mix(in srgb, var(--moon) 16%, transparent); }
-:root[data-theme="light"] .luna-spinner { border-color: color-mix(in srgb, var(--moon) 25%, transparent); border-top-color: var(--moon-dark); }
-/* the footer pill sits over the coloured ground instead of under it */
-:root[data-theme="light"] .screen { position: relative; }
-:root[data-theme="light"] .footer { position: absolute; left: 0; right: 0; bottom: 0; padding: 0 0 12px; }
+/* Light theme: the same scene as the dark theme with its lights and darks swapped — a pale sky
+   (it starts from the title bar's colour, so there is no edge), dark stars and shooting stars, a
+   dark moon, dark halos. The colours come from the palette (--star, --moon-lit/--moon-shade, ...). */
+:root[data-theme="light"] .hero-stars { --stars: 0.9; }
 
 /* Content fades out under the title bar and at the window's bottom edge instead
    of being cut by a hard line while scrolling. Eased stops avoid a visible band. */
@@ -899,16 +878,63 @@
 }
 
 /* ---- AppearanceSection.tsx: My skyboxes ---- */
-.sky-mine { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line); }
+.sky-mine { margin-top: 16px; }
 .sky-mine-title { margin: 0 0 2px; font-family: var(--font-display); font-size: 12.5px; font-weight: 700; }
 .sky-mine-list { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
-.sky-mine-item { display: flex; align-items: center; gap: 4px; padding: 4px 6px 4px 4px; border: 1px solid var(--line-strong); border-radius: 13px; background: var(--bg-canvas); }
+.sky-mine-item { display: flex; align-items: center; gap: 6px; padding: 4px 6px 4px 4px; border: 1px solid var(--line-strong); border-radius: 13px; background: var(--bg-canvas); }
 .sky-mine-item--on { border-color: var(--ember); }
-.sky-mine-apply { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 0; border: none; background: transparent; color: var(--ink-muted); text-align: left; font-size: 12.5px; font-weight: 600; }
+.sky-mine-apply { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; align-self: stretch; padding: 0; border: none; background: transparent; color: var(--ink-muted); text-align: left; font-size: 12.5px; font-weight: 600; }
 .sky-mine-apply:hover:not(:disabled) { color: var(--ink); }
 .sky-mine-item--on .sky-mine-apply { color: var(--ember-text); }
-.sky-mine-apply img, .sky-mine-noimg { flex: none; width: 38px; height: 38px; border-radius: 10px; object-fit: cover; }
+.sky-mine-thumb { flex: none; width: 38px; height: 38px; border-radius: 10px; object-fit: cover; }
+.sky-mine-rename { flex: 1; min-width: 0; height: 32px; padding: 0 10px; }
 .sky-mine-noimg { background: linear-gradient(160deg, var(--sky-top), var(--horizon)); }
 .sky-mine-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sky-mine-count { flex: none; font-size: 10.5px; font-weight: 600; color: var(--ink-faint); }
 .sky-mine-empty { margin: 10px 0 0; }
+
+/* ---- TooltipLayer.tsx: Luna's own tooltip ---- */
+.luna-tip {
+  position: fixed; z-index: 9999; pointer-events: none; max-width: 220px; width: max-content;
+  transform: translate(-50%, -100%);
+  padding: 6px 10px; border-radius: 10px;
+  background: var(--bg-surface); color: var(--ink); border: 1px solid var(--line-strong);
+  box-shadow: 0 12px 26px -10px rgba(0, 0, 0, 0.55), 0 0 0 1px var(--glow-soft);
+  font-size: 11.5px; font-weight: 500; line-height: 1.4; overflow-wrap: anywhere;
+  animation: tip-in 150ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.luna-tip--below { transform: translate(-50%, 0); }
+@keyframes tip-in { from { opacity: 0; translate: 0 4px; } }
+.luna-tip--below { animation-name: tip-in-below; }
+@keyframes tip-in-below { from { opacity: 0; translate: 0 -4px; } }
+
+/* ---- UpdateToast.tsx: top-right update notice ---- */
+.update-toast {
+  position: fixed; top: 48px; right: 12px; z-index: 900; width: 244px;
+  display: flex; flex-direction: column; gap: 10px; padding: 12px 14px;
+  background: var(--bg-surface); color: var(--ink);
+  border: 1px solid var(--line-strong); border-radius: 16px;
+  box-shadow: 0 18px 36px -14px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--glow-soft);
+  animation: toast-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes toast-in { from { opacity: 0; translate: 16px 0; } }
+.update-toast-dot { position: absolute; top: 14px; right: 14px; width: 8px; height: 8px; border-radius: 50%; background: var(--moon); box-shadow: 0 0 10px var(--glow); }
+.update-toast-text { font-size: 12.5px; line-height: 1.4; padding-right: 18px; }
+.update-toast-bar { display: block; height: 4px; margin-top: 8px; border-radius: 4px; background: var(--line-strong); overflow: hidden; }
+.update-toast-bar i { display: block; height: 100%; border-radius: inherit; background: var(--moon-gradient); transition: width 200ms ease; }
+.update-toast-actions { display: flex; gap: 8px; }
+.update-toast-btn { flex: 1; height: 30px; border-radius: 11px; border: 1px solid var(--line-strong); background: transparent; color: var(--ink-muted); font-size: 12px; font-weight: 600; }
+.update-toast-btn:hover:not(:disabled) { color: var(--ink); }
+.update-toast-btn--main { border-color: transparent; background: var(--moon-gradient); color: var(--ink-on-moon); }
+
+/* ---- PatchNotes.tsx ---- */
+.modal-backdrop { position: fixed; inset: 0; z-index: 950; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(0, 0, 0, 0.5); animation: fade-in 200ms ease both; }
+@keyframes fade-in { from { opacity: 0; } }
+.modal-card { width: 100%; max-width: 340px; max-height: 100%; display: flex; flex-direction: column; gap: 12px; padding: 18px; background: var(--bg-surface); border: 1px solid var(--line-strong); border-radius: 20px; box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.7); animation: modal-in 360ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+@keyframes modal-in { from { opacity: 0; translate: 0 12px; scale: 0.97; } }
+.modal-title { margin: 0; font-family: var(--font-display); font-size: 15px; font-weight: 800; }
+.modal-body { overflow-y: auto; min-height: 0; font-size: 12.5px; line-height: 1.55; color: var(--ink-muted); scrollbar-width: thin; }
+.modal-body h4 { margin: 10px 0 4px; font-size: 12.5px; color: var(--ink); }
+.modal-body p { margin: 0 0 8px; }
+.modal-body ul { margin: 0 0 8px; padding-left: 18px; }
+.modal-body li { margin-bottom: 3px; }

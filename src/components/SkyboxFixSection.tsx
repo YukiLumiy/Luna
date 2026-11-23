@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ToggleSwitch } from "./ToggleSwitch";
+import { StatusLine } from "./StatusLine";
 import { useT } from "../i18n";
 
 interface FixStatus {
@@ -92,8 +93,7 @@ export function SkyboxFixSection() {
             {t("common.remove")}
           </button>
         </div>
-        {message && <p className="appearance-hint">{message}</p>}
-        {error && <p className="flag-error">{error}</p>}
+        <StatusLine text={error ?? message} error={Boolean(error)} />
       </div>
 
       <div className="field-row">

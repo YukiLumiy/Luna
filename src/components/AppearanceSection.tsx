@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { useT, type Key } from "../i18n";
+import { useArmed } from "../useArmed";
+import { StatusLine } from "./StatusLine";
 
 type FaceKey = "up" | "dn" | "ft" | "bk" | "lf" | "rt";
 
@@ -45,13 +47,15 @@ interface UserSkyPreset {
 
 interface AppearanceSectionProps {
   onApplied: () => void;
+  /** Bumped by the parent when profiles were renamed/deleted, so what is shown is re-read. */
+  syncKey?: number;
 }
 
 function baseName(path: string) {
   return path.split(/[/\\]/).pop() ?? path;
 }
 
-export function AppearanceSection({ onApplied }: AppearanceSectionProps) {
+export function AppearanceSection({ onApplied, syncKey = 0 }: AppearanceSectionProps) {
   const t = useT();
   // What's already applied, per Luna's saved settings — shown until the
   // person picks something new.
@@ -76,7 +80,9 @@ export function AppearanceSection({ onApplied }: AppearanceSectionProps) {
   // Skyboxes the person saved themselves.
   const [mine, setMine] = useState<UserSkyPreset[]>([]);
   const [mineName, setMineName] = useState("");
-  const [armedDelete, setArmedDelete] = useState<string | null>(null);
+  const { armed: armedDelete, arm: armDelete, disarm: disarmDelete } = useArmed();
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState("");
 
   // "Applied" is read from the files, not from a remembered name, so it
   // drops back by itself when the profile is switched off, deleted or
@@ -106,7 +112,8 @@ export function AppearanceSection({ onApplied }: AppearanceSectionProps) {
   }, []);
   useEffect(() => {
     loadMine();
-  }, [loadMine]);
+    void refreshState();
+  }, [loadMine, refreshState, syncKey]);
 
   useEffect(() => {
     invoke<SkyPreset[]>("list_sky_presets").then(setPresets).catch(() => undefined);
@@ -206,10 +213,11 @@ export function AppearanceSection({ onApplied }: AppearanceSectionProps) {
   async function resetSkybox() {
     setSkyBusy(true);
     try {
-      await invoke("reset_appearance", { kind: "skybox" });
+      const off = await invoke<string[]>("reset_appearance", { kind: "skybox" });
       setPendingSkyPaths({});
       setAppliedSkyFaces({});
-      setSkyStatus(t("sky.resetDone"));
+      setSkyStatus(off.length ? t("sky.resetOff", { names: off.join(", ") }) : t("sky.resetDone"));
+      await refreshState();
       onApplied();
     } catch (err) {
       setSkyStatus(String(err));
@@ -219,6 +227,7 @@ export function AppearanceSection({ onApplied }: AppearanceSectionProps) {
   }
 
   async function applyPreset(preset: SkyPreset) {
+    if (skyBusy) return;
     setSkyBusy(true);
     setSkyStatus(null);
     try {
@@ -252,6 +261,7 @@ export function AppearanceSection({ onApplied }: AppearanceSectionProps) {
   }
 
   async function applyMine(p: UserSkyPreset) {
+    if (skyBusy) return;
     setSkyBusy(true);
     setSkyStatus(null);
     try {
@@ -269,14 +279,37 @@ export function AppearanceSection({ onApplied }: AppearanceSectionProps) {
 
   async function deleteMine(name: string) {
     if (armedDelete !== name) {
-      setArmedDelete(name);
-      window.setTimeout(() => setArmedDelete((cur) => (cur === name ? null : cur)), 3000);
+      armDelete(name);
       return;
     }
-    setArmedDelete(null);
+    disarmDelete();
     try {
       await invoke("delete_user_sky_preset", { name });
       loadMine();
+      void refreshState();
+    } catch (err) {
+      setSkyStatus(String(err));
+    }
+  }
+
+  function startRenameMine(name: string) {
+    disarmDelete();
+    setRenaming(name);
+    setRenameDraft(name);
+  }
+
+  async function commitRenameMine(oldName: string) {
+    const next = renameDraft.trim();
+    if (!next || next === oldName) {
+      setRenaming(null);
+      return;
+    }
+    try {
+      const saved = await invoke<string>("rename_user_sky_preset", { oldName, newName: next });
+      setRenaming(null);
+      setSkyStatus(t("sky.renamed", { name: saved }));
+      loadMine();
+      void refreshState();
     } catch (err) {
       setSkyStatus(String(err));
     }
@@ -325,7 +358,7 @@ export function AppearanceSection({ onApplied }: AppearanceSectionProps) {
             {t("common.reset")}
           </button>
         </div>
-        {fontStatus && <p className="appearance-status">{fontStatus}</p>}
+        <StatusLine text={fontStatus} />
       </section>
 
       <section className="appearance-block">
@@ -371,7 +404,7 @@ export function AppearanceSection({ onApplied }: AppearanceSectionProps) {
             {t("common.reset")}
           </button>
         </div>
-        {skyStatus && <p className="appearance-status">{skyStatus}</p>}
+        <StatusLine text={skyStatus} reserve />
 
         {presets.length > 0 && (
           <div className="sky-templates">
@@ -401,7 +434,7 @@ export function AppearanceSection({ onApplied }: AppearanceSectionProps) {
                     onPointerEnter={() => setHotSlug(p.slug)}
                     onFocus={() => setHotSlug(p.slug)}
                     onClick={() => applyPreset(p)}
-                    disabled={skyBusy}
+                    aria-busy={skyBusy}
                     title={t("sky.templateTitle", { name: p.name })}
                   >
                     <img src={thumbFor(p.slug)} alt="" draggable={false} />
@@ -441,35 +474,73 @@ export function AppearanceSection({ onApplied }: AppearanceSectionProps) {
           ) : (
             <div className="sky-mine-list">
               {mine.map((p) => {
-                const on = p.faces.length > 0 && p.faces.every((k) => appliedSkyFaces[k] === p.name);
+                const label = `my:${p.name}`;
+                const on = p.faces.length > 0 && p.faces.every((k) => appliedSkyFaces[k] === label);
+                const armed = armedDelete === p.name;
+                const editing = renaming === p.name;
                 return (
                   <div key={p.name} className={`sky-mine-item ${on ? "sky-mine-item--on" : ""}`}>
-                    <button
-                      className="sky-mine-apply"
-                      onClick={() => applyMine(p)}
-                      disabled={skyBusy}
-                      title={t("sky.mineTitle", { name: p.name })}
-                    >
-                      {p.thumb ? (
-                        <img src={p.thumb} alt="" draggable={false} />
-                      ) : (
-                        <span className="sky-mine-noimg" aria-hidden />
-                      )}
-                      <span className="sky-mine-name">{p.name}</span>
-                      <span className="sky-mine-count">{p.faces.length}/6</span>
-                    </button>
-                    <button
-                      className={`icon-btn ${armedDelete === p.name ? "icon-btn--danger" : ""}`}
-                      onClick={() => deleteMine(p.name)}
-                      title={t("sky.mineDelete", { name: p.name })}
-                      aria-label={t("sky.mineDelete", { name: p.name })}
-                    >
-                      {armedDelete === p.name ? (
-                        <span className="icon-btn-text">{t("profiles.deleteConfirm")}</span>
-                      ) : (
-                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
-                      )}
-                    </button>
+                    {p.thumb ? (
+                      <img className="sky-mine-thumb" src={p.thumb} alt="" draggable={false} />
+                    ) : (
+                      <span className="sky-mine-thumb sky-mine-noimg" aria-hidden />
+                    )}
+                    {editing ? (
+                      <input
+                        className="flag-input sky-mine-rename"
+                        value={renameDraft}
+                        autoFocus
+                        maxLength={40}
+                        spellCheck={false}
+                        aria-label={t("sky.rename", { name: p.name })}
+                        onChange={(e) => setRenameDraft(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") void commitRenameMine(p.name);
+                          if (e.key === "Escape") setRenaming(null);
+                        }}
+                      />
+                    ) : (
+                      <button
+                        className="sky-mine-apply"
+                        onClick={() => applyMine(p)}
+                        aria-busy={skyBusy}
+                        title={t("sky.mineTitle", { name: p.name })}
+                      >
+                        <span className="sky-mine-name">{p.name}</span>
+                        {!armed && <span className="sky-mine-count">{p.faces.length}/6</span>}
+                      </button>
+                    )}
+                    {editing ? (
+                      <>
+                        <button className="icon-btn" aria-label={t("common.save")} title={t("common.save")} onClick={() => commitRenameMine(p.name)}>
+                          <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3.2 3.2L13 4.8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                        </button>
+                        <button className="icon-btn" aria-label={t("common.cancel")} title={t("common.cancel")} onClick={() => setRenaming(null)}>
+                          <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        {!armed && (
+                          <button className="icon-btn" aria-label={t("sky.rename", { name: p.name })} title={t("common.rename")} onClick={() => startRenameMine(p.name)}>
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M10.5 3.2l2.3 2.3M2.8 13.2l.5-2.9 7.2-7.1 2.3 2.3-7.1 7.2-2.9.5z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round" /></svg>
+                          </button>
+                        )}
+                        <button
+                          className={`icon-btn ${armed ? "icon-btn--danger" : ""}`}
+                          data-armed={armed}
+                          onClick={() => deleteMine(p.name)}
+                          title={armed ? undefined : t("sky.mineDelete", { name: p.name })}
+                          aria-label={t("sky.mineDelete", { name: p.name })}
+                        >
+                          {armed ? (
+                            <span className="icon-btn-text">{t("profiles.deleteConfirm")}</span>
+                          ) : (
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
+                          )}
+                        </button>
+                      </>
+                    )}
                   </div>
                 );
               })}

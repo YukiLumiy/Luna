@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { notifyFlagsChanged, onFlagsChanged } from "../flagEvents";
 import { useT } from "../i18n";
+import { useArmed } from "../useArmed";
 
 type FlagValue = string | number | boolean;
 type FlagMap = Record<string, FlagValue>;
@@ -17,6 +18,7 @@ export function FastFlagsSection() {
   const [editing, setEditing] = useState<string | null>(null);
   const [draftKey, setDraftKey] = useState("");
   const [draftValue, setDraftValue] = useState("");
+  const { armed: armedReset, arm: armReset, disarm: disarmReset } = useArmed();
 
   useEffect(() => {
     const load = () =>
@@ -61,6 +63,15 @@ export function FastFlagsSection() {
     const next = { ...flags };
     delete next[key];
     persist(next);
+  }
+
+  /** Clears every flag (two clicks: the first asks "Delete all N flags?"). */
+  function resetAll() {
+    if (armedReset === null) return armReset("all");
+    disarmReset();
+    setEditing(null);
+    void persist({});
+    setStatus(null);
   }
 
   function startEdit(key: string) {
@@ -168,6 +179,16 @@ export function FastFlagsSection() {
             </li>
           ))}
         </ul>
+      )}
+
+      {entries.length > 0 && (
+        <button
+          className={`reset-btn flag-reset-all ${armedReset ? "reset-btn--danger" : ""}`}
+          data-armed={armedReset !== null}
+          onClick={resetAll}
+        >
+          {armedReset ? t("flags.resetConfirm", { n: entries.length }) : t("flags.resetAll")}
+        </button>
       )}
 
       <div className="flag-add-row">

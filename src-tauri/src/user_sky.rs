@@ -11,8 +11,8 @@ use serde::Serialize;
 use crate::mods::{ensure_profile_writable, mods_root, validate_profile_name};
 use crate::paths::luna_state_dir;
 use crate::settings::{get_settings, update_settings};
-use crate::sky::{encode_sky_face, SKY_DIRS};
-use crate::sky_presets::{FACE_KEYS, PRESETS};
+use crate::sky::{decode_bc1_dds, encode_sky_face, SKY_DIRS};
+use crate::sky_presets::FACE_KEYS;
 
 fn presets_root() -> Result<PathBuf, String> {
     let dir = luna_state_dir()?.join("user-sky-presets");
@@ -47,6 +47,26 @@ fn face_file(dir: &Path, key: &str) -> PathBuf {
     dir.join(format!("sky512_{key}.tex"))
 }
 
+/// A saved skybox is previewed by one of its own faces (front if it has one, else the
+/// first it has), decoded from the stored `.tex` — so the preview always matches what is
+/// applied, whatever kind of file the face came from. Written as `thumb.jpg` in the preset.
+fn make_thumb(dir: &Path) {
+    for key in ["ft", "lf", "rt", "bk", "up", "dn"] {
+        let Ok(bytes) = fs::read(face_file(dir, key)) else { continue };
+        let Some(img) = decode_bc1_dds(&bytes) else { continue };
+        let thumb = image::DynamicImage::ImageRgb8(img).thumbnail(128, 128).to_rgb8();
+        if thumb.save_with_format(dir.join("thumb.jpg"), image::ImageFormat::Jpeg).is_ok() {
+            return;
+        }
+    }
+}
+
+/// The name Luna remembers for the faces of a saved skybox, so it can't be mistaken
+/// for a built-in template of the same name.
+fn applied_label(name: &str) -> String {
+    format!("my:{name}")
+}
+
 fn checked_name(name: &str) -> Result<String, String> {
     validate_profile_name(name)
 }
@@ -66,6 +86,9 @@ pub fn list_user_sky_presets() -> Result<Vec<UserPresetInfo>, String> {
             .filter(|k| face_file(&path, k).is_file())
             .map(|k| k.to_string())
             .collect();
+        if !path.join("thumb.jpg").is_file() {
+            make_thumb(&path); // presets saved before previews existed
+        }
         let thumb = fs::read(path.join("thumb.jpg"))
             .ok()
             .map(|b| format!("data:image/jpeg;base64,{}", base64(&b)));
@@ -84,26 +107,16 @@ pub fn save_user_sky_preset(
     name: String,
     faces: HashMap<String, String>,
 ) -> Result<String, String> {
+    // Built-in templates and saved skyboxes are separate lists: the same name is fine.
     let name = checked_name(&name)?;
-    if PRESETS.iter().any(|p| p.name.eq_ignore_ascii_case(&name)) {
-        return Err("That name is used by a built-in template".into());
-    }
 
     let root = mods_root(&app_handle)?;
     let applied_dir = root.join("custom-skybox").join("content").join("sky");
 
     let mut encoded: Vec<(&str, Vec<u8>)> = Vec::new();
-    let mut thumb_source: Option<PathBuf> = None;
     for key in FACE_KEYS {
         if let Some(path) = faces.get(key) {
             encoded.push((key, encode_sky_face(Path::new(path))?));
-            let is_tex = Path::new(path)
-                .extension()
-                .map(|e| e.eq_ignore_ascii_case("tex"))
-                .unwrap_or(false);
-            if thumb_source.is_none() && !is_tex {
-                thumb_source = Some(PathBuf::from(path));
-            }
         } else if let Ok(bytes) = fs::read(face_file(&applied_dir, key)) {
             encoded.push((key, bytes));
         }
@@ -120,14 +133,7 @@ pub fn save_user_sky_preset(
     for (key, bytes) in &encoded {
         fs::write(face_file(&dir, key), bytes).map_err(|e| e.to_string())?;
     }
-    if let Some(src) = thumb_source {
-        if let Ok(img) = image::open(&src) {
-            let _ = img
-                .thumbnail(128, 128)
-                .to_rgb8()
-                .save_with_format(dir.join("thumb.jpg"), image::ImageFormat::Jpeg);
-        }
-    }
+    make_thumb(&dir);
     Ok(name)
 }
 
@@ -162,7 +168,7 @@ pub fn apply_user_sky_preset(app_handle: tauri::AppHandle, name: String) -> Resu
         let src = face_file(&dir, key);
         if src.is_file() {
             fs::copy(&src, face_file(&sky_dir, key)).map_err(|e| e.to_string())?;
-            settings.active_sky_faces.insert(key.to_string(), name.clone());
+            settings.active_sky_faces.insert(key.to_string(), applied_label(&name));
             written += 1;
         }
     }
@@ -171,6 +177,34 @@ pub fn apply_user_sky_preset(app_handle: tauri::AppHandle, name: String) -> Resu
     }
     let _ = update_settings(settings);
     Ok(name)
+}
+
+/// Renames a saved skybox. If it is the one applied right now, the remembered name follows.
+#[tauri::command]
+pub fn rename_user_sky_preset(old_name: String, new_name: String) -> Result<String, String> {
+    let old = checked_name(&old_name)?;
+    let new = checked_name(&new_name)?;
+    let root = presets_root()?;
+    let (from, to) = (root.join(&old), root.join(&new));
+    if !from.is_dir() {
+        return Err(format!("No saved skybox named '{old}'"));
+    }
+    if old == new {
+        return Ok(new);
+    }
+    if to.exists() && !old.eq_ignore_ascii_case(&new) {
+        return Err(format!("A saved skybox named '{new}' already exists"));
+    }
+    fs::rename(&from, &to).map_err(|e| e.to_string())?;
+    let mut settings = get_settings().unwrap_or_default();
+    let (was, now) = (applied_label(&old), applied_label(&new));
+    for label in settings.active_sky_faces.values_mut() {
+        if *label == was {
+            *label = now.clone();
+        }
+    }
+    let _ = update_settings(settings);
+    Ok(new)
 }
 
 #[tauri::command]

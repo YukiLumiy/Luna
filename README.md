@@ -38,3 +38,6 @@ tauri.conf.json の updater の endpoints は YukiLumiy/Luna を仮置きして�
 - Roblox 自前インストール / 更新（ブートストラッパー）
 
 - 配色: Settings → Advanced → Palette で8種類（A Midnight Indigo / B Dusty Rose / C Deep Teal / D Wine & Champagne / E Sakura / F Violet Dusk / G Crimson / H Graphite）。それぞれダーク・ライトあり。`src/styles/palettes.css` は生成物（元データは palettes.ts と同じ表）
+- ライトテーマはダークの場面の明暗を反転（淡い空・暗い月・暗い星。ウィンドウのタブも）。パネルはホバーしても拡大しない
+- 削除の「Delete?」は useArmed.ts（別の場所をクリック / Esc / 数秒で × に戻る）。ツールチップは TooltipLayer.tsx（title 属性を自動で置き換え）。アップデート通知は UpdateToast.tsx、更新後の初回だけ PatchNotes.tsx（本文は RELEASE_NOTES.md がリリース本文になる）
+- 色は `tools/genpal.py` で生成（palettes.css）。色を足す・調整するときはここの表を編集して実行

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ToggleSwitch } from "./ToggleSwitch";
 import { useT } from "../i18n";
@@ -10,6 +10,7 @@ import { UpdateSection } from "./UpdateSection";
 import { FFlagPresetsSection } from "./FFlagPresetsSection";
 import { FFlagProfilesSection } from "./FFlagProfilesSection";
 import { AdvancedSection } from "./AdvancedSection";
+import { useArmed } from "../useArmed";
 
 interface ModProfileInfo {
   name: string;
@@ -30,10 +31,9 @@ export function SettingsScreen({ onBack, onProfilesChanged }: SettingsScreenProp
   // Which row is being renamed / is waiting for a second click to delete.
   const [renaming, setRenaming] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
-  const [armed, setArmed] = useState<string | null>(null);
-  const armTimer = useRef<number | undefined>(undefined);
-  // Remounts the Appearance block, so its "Active" tags follow a deleted or
-  // renamed font/skybox profile.
+  const { armed, arm, disarm } = useArmed();
+  // Tells the Appearance block to re-read what is applied after a profile was deleted or
+  // renamed. (It used to be remounted, which replayed its entrance animation: a visible jolt.)
   const [appearanceKey, setAppearanceKey] = useState(0);
 
   async function refresh() {
@@ -63,12 +63,10 @@ export function SettingsScreen({ onBack, onProfilesChanged }: SettingsScreenProp
     }
   }
 
-  useEffect(() => () => window.clearTimeout(armTimer.current), []);
-
   function startRename(name: string) {
     setRenaming(name);
     setDraft(name);
-    setArmed(null);
+    disarm();
     setError(null);
   }
 
@@ -93,13 +91,10 @@ export function SettingsScreen({ onBack, onProfilesChanged }: SettingsScreenProp
 
   async function handleDelete(name: string) {
     if (armed !== name) {
-      setArmed(name);
-      window.clearTimeout(armTimer.current);
-      armTimer.current = window.setTimeout(() => setArmed(null), 3500);
+      arm(name);
       return;
     }
-    window.clearTimeout(armTimer.current);
-    setArmed(null);
+    disarm();
     setPending(name);
     try {
       await invoke("delete_mod_profile", { name });
@@ -131,7 +126,7 @@ export function SettingsScreen({ onBack, onProfilesChanged }: SettingsScreenProp
         <h2>{t("settings.title")}</h2>
       </div>
 
-      <AppearanceSection key={appearanceKey} onApplied={refresh} />
+      <AppearanceSection syncKey={appearanceKey} onApplied={refresh} />
       <UpdateSection />
       <SkyboxFixSection />
       <RecacheSection />
@@ -201,8 +196,9 @@ export function SettingsScreen({ onBack, onProfilesChanged }: SettingsScreenProp
                   </button>
                   <button
                     className={`icon-btn ${armed === profile.name ? "icon-btn--danger" : ""}`}
+                    data-armed={armed === profile.name}
                     aria-label={t("profiles.delete", { name: profile.name })}
-                    title={t("common.delete")}
+                    title={armed === profile.name ? undefined : t("common.delete")}
                     onClick={() => handleDelete(profile.name)}
                     disabled={pending === profile.name}
                   >

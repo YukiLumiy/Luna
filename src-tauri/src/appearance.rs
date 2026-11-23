@@ -190,8 +190,11 @@ pub fn get_appearance_state(app_handle: tauri::AppHandle) -> Result<AppearanceSt
 
 /// Back to Roblox's own font / skybox: the profile is deleted (Roblox's
 /// stock files are restored at the next launch) and Luna forgets it.
+/// For the skybox, other enabled profiles that carry sky faces (ones the person put in
+/// `mods/` by hand) are switched off too — otherwise Roblox would keep using their sky
+/// and the faces would show as applied again a moment later. Returns their names.
 #[tauri::command]
-pub fn reset_appearance(app_handle: tauri::AppHandle, kind: String) -> Result<(), String> {
+pub fn reset_appearance(app_handle: tauri::AppHandle, kind: String) -> Result<Vec<String>, String> {
     let profile = match kind.as_str() {
         "font" => "custom-font",
         "skybox" => "custom-skybox",
@@ -201,6 +204,16 @@ pub fn reset_appearance(app_handle: tauri::AppHandle, kind: String) -> Result<()
     if profile_exists(&root, profile) {
         crate::mods::delete_profile_in(&root, profile)?;
     }
+    let mut turned_off = Vec::new();
+    if kind == "skybox" {
+        for name in crate::sky::profiles_with_sky(&root) {
+            let from = root.join(&name);
+            let to = root.join(format!("{}{}", crate::mods::DISABLED_PREFIX, name));
+            if !to.exists() && fs::rename(&from, &to).is_ok() {
+                turned_off.push(name);
+            }
+        }
+    }
     let mut settings = get_settings().unwrap_or_default();
     if kind == "font" {
         settings.active_font_name = None;
@@ -208,5 +221,5 @@ pub fn reset_appearance(app_handle: tauri::AppHandle, kind: String) -> Result<()
         settings.active_sky_faces.clear();
     }
     let _ = update_settings(settings);
-    Ok(())
+    Ok(turned_off)
 }

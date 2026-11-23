@@ -57,6 +57,7 @@ fn main() {
             user_sky::list_user_sky_presets,
             user_sky::save_user_sky_preset,
             user_sky::apply_user_sky_preset,
+            user_sky::rename_user_sky_preset,
             user_sky::delete_user_sky_preset,
             recache::get_recache_status,
             recache::recache_save,

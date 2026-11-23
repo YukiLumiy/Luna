@@ -36,6 +36,18 @@ jobs:
         with:
           workspaces: src-tauri
       - run: pnpm install --frozen-lockfile
+      # The text of RELEASE_NOTES.md becomes the release's body, which the updater delivers with
+      # the update — Luna shows it once, on the first start after updating. Edit that file
+      # before tagging a release.
+      - id: notes
+        shell: bash
+        run: |
+          {
+            echo 'body<<NOTES_EOF'
+            cat RELEASE_NOTES.md
+            echo
+            echo 'NOTES_EOF'
+          } >> "$GITHUB_OUTPUT"
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -44,7 +56,7 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: Luna ${{ github.ref_name }}
-          releaseBody: See the assets to download and install.
+          releaseBody: ${{ steps.notes.outputs.body }}
           releaseDraft: false
           prerelease: false
           includeUpdaterJson: true

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ToggleSwitch } from "./ToggleSwitch";
+import { StatusLine } from "./StatusLine";
 import { useT } from "../i18n";
 
 interface RecacheStatus {
@@ -98,8 +99,7 @@ export function RecacheSection() {
           {t("recache.restoreNow")}
         </button>
       </div>
-      {message && <p className="appearance-hint">{message}</p>}
-      {error && <p className="flag-error">{error}</p>}
+      <StatusLine text={error ?? message} error={Boolean(error)} />
     </section>
   );
 }

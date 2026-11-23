@@ -10,6 +10,11 @@ import { PrimaryButton, SecondaryButton } from "./components/Buttons";
 import { StatusPill } from "./components/StatusPill";
 import { SettingsScreen } from "./components/SettingsScreen";
 import { applyTheme } from "./theme";
+import { TooltipLayer } from "./components/TooltipLayer";
+import { UpdateToast } from "./components/UpdateToast";
+import { PatchNotes } from "./components/PatchNotes";
+import { autoUpdateEnabled, checkForUpdate, takePatchNotes } from "./updater";
+import { getVersion } from "@tauri-apps/api/app";
 
 type LaunchState = "idle" | "launching" | "running" | "error";
 type View = "home" | "settings";
@@ -23,6 +28,8 @@ export default function App() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [linked, setLinked] = useState<boolean | null>(null);
   const alive = useRef(true);
+  // Release notes, shown once on the first start after an update.
+  const [notes, setNotes] = useState<{ version: string; notes: string } | null>(null);
 
   const refreshProtocol = useCallback(() => {
     api.protocolStatus().then((s) => alive.current && setLinked(s.registered_to_luna)).catch(() => alive.current && setLinked(null));
@@ -45,6 +52,17 @@ export default function App() {
       unStart.then((f) => f());
     };
   }, [refreshProtocol]);
+
+  const startupChecked = useRef(false);
+  useEffect(() => {
+    if (startupChecked.current) return; // StrictMode runs effects twice in development
+    startupChecked.current = true;
+    getVersion()
+      .then((v) => setNotes(takePatchNotes(v)))
+      .catch(() => undefined);
+    // Quietly ask whether a newer release exists; the toast (top right) appears if so.
+    if (autoUpdateEnabled()) void checkForUpdate(true);
+  }, []);
 
   function go(next: View) {
     setDirection(next === "settings" ? "forward" : "backward");
@@ -75,6 +93,9 @@ export default function App() {
   return (
     <div className="app">
       <TitleBar />
+      <UpdateToast />
+      <TooltipLayer />
+      {notes && <PatchNotes version={notes.version} notes={notes.notes} onClose={() => setNotes(null)} />}
 
       <div className="screen-viewport" data-view={view}>
         <div key={view} className={`screen screen--${direction}`}>

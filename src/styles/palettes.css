@@ -7,8 +7,8 @@
   --line: rgba(169, 182, 255, 0.13);
   --line-strong: rgba(169, 182, 255, 0.28);
   --ink: #f9faff;
-  --ink-muted: #acadb7;
-  --ink-faint: #787a88;
+  --ink-muted: #babbc4;
+  --ink-faint: #9799a4;
   --moon-hi: #fbfbff;
   --moon-light: #c7d0ff;
   --moon: #a9b6ff;
@@ -33,6 +33,7 @@
   --danger-bg: #351e32;
   --moon-lit: #f6f8ff;
   --moon-shade: #737db3;
+  --star: #fff3e6;
   --night-top: #080a18;
   --night-mid: #0d1230;
   --night-low: #1a2350;
@@ -53,8 +54,8 @@
   --line: rgba(34, 34, 35, 0.09);
   --line-strong: rgba(34, 34, 35, 0.17);
   --ink: #1d1d1e;
-  --ink-muted: #606372;
-  --ink-faint: #8f909a;
+  --ink-muted: #464754;
+  --ink-faint: #61636c;
   --moon-hi: #ffffff;
   --moon-light: #8c98f4;
   --moon: #5b6cf0;
@@ -73,8 +74,11 @@
   --hero-line: #5b6cf0;
   --halo: #5b6cf0;
   --reflect: #6f7ef2;
-  --moon-glow: rgba(91, 108, 240, 0.3);
-  --moon-glow-mid: rgba(91, 108, 240, 0.06);
+  --moon-glow: rgba(91, 108, 240, 0.26);
+  --moon-glow-mid: rgba(91, 108, 240, 0.05);
+  --moon-lit: #5b6cf0;
+  --moon-shade: #23295b;
+  --star: #2e3678;
   --btn-drop: 0 10px 14px rgba(91, 108, 240, 0.3);
   --danger-bg: #fde4e9;
 }
@@ -86,8 +90,8 @@
   --line: rgba(217, 160, 185, 0.13);
   --line-strong: rgba(217, 160, 185, 0.28);
   --ink: #fcf8fa;
-  --ink-muted: #b1acb0;
-  --ink-faint: #80797e;
+  --ink-muted: #bfbabd;
+  --ink-faint: #9d979c;
   --moon-hi: #fdfafc;
   --moon-light: #e6c1d2;
   --moon: #d9a0b9;
@@ -112,6 +116,7 @@
   --danger-bg: #3f1e27;
   --moon-lit: #fbf6f8;
   --moon-shade: #966e81;
+  --star: #fff3e6;
   --night-top: #120c11;
   --night-mid: #1f1420;
   --night-low: #33202f;
@@ -132,8 +137,8 @@
   --line: rgba(34, 34, 34, 0.09);
   --line-strong: rgba(34, 34, 34, 0.17);
   --ink: #1e1d1d;
-  --ink-muted: #6a5f64;
-  --ink-faint: #968d91;
+  --ink-muted: #4e4548;
+  --ink-faint: #676063;
   --moon-hi: #ffffff;
   --moon-light: #c98aa3;
   --moon: #b2587c;
@@ -152,8 +157,11 @@
   --hero-line: #b2587c;
   --halo: #b2587c;
   --reflect: #bb6c8c;
-  --moon-glow: rgba(178, 88, 124, 0.3);
-  --moon-glow-mid: rgba(178, 88, 124, 0.06);
+  --moon-glow: rgba(178, 88, 124, 0.26);
+  --moon-glow-mid: rgba(178, 88, 124, 0.05);
+  --moon-lit: #b2587c;
+  --moon-shade: #44212f;
+  --star: #592c3e;
   --btn-drop: 0 10px 14px rgba(178, 88, 124, 0.3);
   --danger-bg: #fde4e9;
 }
@@ -165,8 +173,8 @@
   --line: rgba(127, 214, 200, 0.13);
   --line-strong: rgba(127, 214, 200, 0.28);
   --ink: #f6fcfb;
-  --ink-muted: #a8b1b1;
-  --ink-faint: #758080;
+  --ink-muted: #b7bfbf;
+  --ink-faint: #939d9d;
   --moon-hi: #f9fdfc;
   --moon-light: #ace4db;
   --moon: #7fd6c8;
@@ -191,6 +199,7 @@
   --danger-bg: #322429;
   --moon-lit: #f2fbfa;
   --moon-shade: #56948c;
+  --star: #fff3e6;
   --night-top: #06100f;
   --night-mid: #0a1d20;
   --night-low: #12363a;
@@ -211,8 +220,8 @@
   --line: rgba(33, 34, 34, 0.09);
   --line-strong: rgba(33, 34, 34, 0.17);
   --ink: #1d1e1d;
-  --ink-muted: #5b6666;
-  --ink-faint: #8a9492;
+  --ink-muted: #414b4a;
+  --ink-faint: #5d6564;
   --moon-hi: #ffffff;
   --moon-light: #6db1aa;
   --moon: #2f8f85;
@@ -231,8 +240,11 @@
   --hero-line: #2f8f85;
   --halo: #2f8f85;
   --reflect: #489c94;
-  --moon-glow: rgba(47, 143, 133, 0.3);
-  --moon-glow-mid: rgba(47, 143, 133, 0.06);
+  --moon-glow: rgba(47, 143, 133, 0.26);
+  --moon-glow-mid: rgba(47, 143, 133, 0.05);
+  --moon-lit: #2f8f85;
+  --moon-shade: #123633;
+  --star: #184842;
   --btn-drop: 0 10px 14px rgba(47, 143, 133, 0.3);
   --danger-bg: #fde4e9;
 }
@@ -244,8 +256,8 @@
   --line: rgba(227, 184, 140, 0.13);
   --line-strong: rgba(227, 184, 140, 0.28);
   --ink: #fdfaf7;
-  --ink-muted: #b2acac;
-  --ink-faint: #81797a;
+  --ink-muted: #c0bbb9;
+  --ink-faint: #9e9797;
   --moon-hi: #fefbf9;
   --moon-light: #edd1b4;
   --moon: #e3b88c;
@@ -270,6 +282,7 @@
   --danger-bg: #3f1b22;
   --moon-lit: #fcf8f4;
   --moon-shade: #9d7d62;
+  --star: #fff3e6;
   --night-top: #120a0c;
   --night-mid: #201014;
   --night-low: #3a1b24;
@@ -290,8 +303,8 @@
   --line: rgba(35, 34, 33, 0.09);
   --line-strong: rgba(35, 34, 33, 0.17);
   --ink: #1e1d1c;
-  --ink-muted: #6b635b;
-  --ink-faint: #96908a;
+  --ink-muted: #4e4842;
+  --ink-faint: #68625c;
   --moon-hi: #ffffff;
   --moon-light: #c89f79;
   --moon: #b0763f;
@@ -310,8 +323,11 @@
   --hero-line: #b0763f;
   --halo: #b0763f;
   --reflect: #b98656;
-  --moon-glow: rgba(176, 118, 63, 0.3);
-  --moon-glow-mid: rgba(176, 118, 63, 0.06);
+  --moon-glow: rgba(176, 118, 63, 0.26);
+  --moon-glow-mid: rgba(176, 118, 63, 0.05);
+  --moon-lit: #b0763f;
+  --moon-shade: #432d18;
+  --star: #583b20;
   --btn-drop: 0 10px 14px rgba(176, 118, 63, 0.3);
   --danger-bg: #fde4e9;
 }
@@ -323,8 +339,8 @@
   --line: rgba(245, 156, 196, 0.13);
   --line-strong: rgba(245, 156, 196, 0.28);
   --ink: #fef8fb;
-  --ink-muted: #b3aab0;
-  --ink-faint: #82777e;
+  --ink-muted: #c1b9bd;
+  --ink-faint: #9f959b;
   --moon-hi: #fefafc;
   --moon-light: #f8bfd9;
   --moon: #f59cc4;
@@ -349,6 +365,7 @@
   --danger-bg: #401925;
   --moon-lit: #fef5f9;
   --moon-shade: #a96a87;
+  --star: #fff3e6;
   --night-top: #14070f;
   --night-mid: #230d1d;
   --night-low: #411634;
@@ -369,8 +386,8 @@
   --line: rgba(35, 34, 34, 0.09);
   --line-strong: rgba(35, 34, 34, 0.17);
   --ink: #1e1d1e;
-  --ink-muted: #725f66;
-  --ink-faint: #9c8e94;
+  --ink-muted: #54454b;
+  --ink-faint: #6d6065;
   --moon-hi: #ffffff;
   --moon-light: #ef8ab1;
   --moon: #e8588f;
@@ -389,8 +406,11 @@
   --hero-line: #e8588f;
   --halo: #e8588f;
   --reflect: #eb6c9c;
-  --moon-glow: rgba(232, 88, 143, 0.3);
-  --moon-glow-mid: rgba(232, 88, 143, 0.06);
+  --moon-glow: rgba(232, 88, 143, 0.26);
+  --moon-glow-mid: rgba(232, 88, 143, 0.05);
+  --moon-lit: #e8588f;
+  --moon-shade: #582136;
+  --star: #742c48;
   --btn-drop: 0 10px 14px rgba(232, 88, 143, 0.3);
   --danger-bg: #fde4e9;
 }
@@ -402,8 +422,8 @@
   --line: rgba(192, 166, 255, 0.13);
   --line-strong: rgba(192, 166, 255, 0.28);
   --ink: #fbf9ff;
-  --ink-muted: #afacb7;
-  --ink-faint: #7c7887;
+  --ink-muted: #bdbac4;
+  --ink-faint: #9a97a3;
   --moon-hi: #fcfbff;
   --moon-light: #d6c5ff;
   --moon: #c0a6ff;
@@ -428,6 +448,7 @@
   --danger-bg: #3a1b30;
   --moon-lit: #f9f6ff;
   --moon-shade: #8471b2;
+  --star: #fff3e6;
   --night-top: #0e0a17;
   --night-mid: #211a33;
   --night-low: #372d50;
@@ -448,8 +469,8 @@
   --line: rgba(34, 34, 35, 0.09);
   --line-strong: rgba(34, 34, 35, 0.17);
   --ink: #1d1d1e;
-  --ink-muted: #65606f;
-  --ink-faint: #928e9a;
+  --ink-muted: #494552;
+  --ink-faint: #64606b;
   --moon-hi: #ffffff;
   --moon-light: #a38ce2;
   --moon: #7c5bd6;
@@ -468,8 +489,11 @@
   --hero-line: #7c5bd6;
   --halo: #7c5bd6;
   --reflect: #8c6fdb;
-  --moon-glow: rgba(124, 91, 214, 0.3);
-  --moon-glow-mid: rgba(124, 91, 214, 0.06);
+  --moon-glow: rgba(124, 91, 214, 0.26);
+  --moon-glow-mid: rgba(124, 91, 214, 0.05);
+  --moon-lit: #7c5bd6;
+  --moon-shade: #2f2351;
+  --star: #3e2e6b;
   --btn-drop: 0 10px 14px rgba(124, 91, 214, 0.3);
   --danger-bg: #fde4e9;
 }
@@ -481,8 +505,8 @@
   --line: rgba(255, 138, 128, 0.13);
   --line-strong: rgba(255, 138, 128, 0.28);
   --ink: #fff7f6;
-  --ink-muted: #b3aaa9;
-  --ink-faint: #817676;
+  --ink-muted: #c1b8b7;
+  --ink-faint: #9f9595;
   --moon-hi: #fff9f9;
   --moon-light: #ffb3ac;
   --moon: #ff8a80;
@@ -507,6 +531,7 @@
   --danger-bg: #3f191e;
   --moon-lit: #fff3f2;
   --moon-shade: #af5e58;
+  --star: #fff3e6;
   --night-top: #110809;
   --night-mid: #2a1616;
   --night-low: #482625;
@@ -527,8 +552,8 @@
   --line: rgba(35, 34, 34, 0.09);
   --line-strong: rgba(35, 34, 34, 0.17);
   --ink: #1e1d1d;
-  --ink-muted: #6f5c5c;
-  --ink-faint: #9a8d8c;
+  --ink-muted: #514343;
+  --ink-faint: #6a5e5e;
   --moon-hi: #ffffff;
   --moon-light: #dd7777;
   --moon: #cf3d3d;
@@ -547,8 +572,11 @@
   --hero-line: #cf3d3d;
   --halo: #cf3d3d;
   --reflect: #d55454;
-  --moon-glow: rgba(207, 61, 61, 0.3);
-  --moon-glow-mid: rgba(207, 61, 61, 0.06);
+  --moon-glow: rgba(207, 61, 61, 0.26);
+  --moon-glow-mid: rgba(207, 61, 61, 0.05);
+  --moon-lit: #cf3d3d;
+  --moon-shade: #4f1717;
+  --star: #681e1e;
   --btn-drop: 0 10px 14px rgba(207, 61, 61, 0.3);
   --danger-bg: #fde4e9;
 }
@@ -560,8 +588,8 @@
   --line: rgba(180, 188, 207, 0.13);
   --line-strong: rgba(180, 188, 207, 0.28);
   --ink: #fafafc;
-  --ink-muted: #aeaeb1;
-  --ink-faint: #7b7c80;
+  --ink-muted: #bcbcbf;
+  --ink-faint: #999a9d;
   --moon-hi: #fbfcfd;
   --moon-light: #ced3e0;
   --moon: #b4bccf;
@@ -586,6 +614,7 @@
   --danger-bg: #392028;
   --moon-lit: #f8f8fa;
   --moon-shade: #7c8290;
+  --star: #fff3e6;
   --night-top: #0c0e11;
   --night-mid: #1e2127;
   --night-low: #33363e;
@@ -606,8 +635,8 @@
   --line: rgba(34, 34, 34, 0.09);
   --line-strong: rgba(34, 34, 34, 0.17);
   --ink: #1d1d1d;
-  --ink-muted: #616164;
-  --ink-faint: #8e9092;
+  --ink-muted: #464749;
+  --ink-faint: #616163;
   --moon-hi: #ffffff;
   --moon-light: #8e929e;
   --moon: #5d6475;
@@ -626,8 +655,11 @@
   --hero-line: #5d6475;
   --halo: #5d6475;
   --reflect: #707786;
-  --moon-glow: rgba(93, 100, 117, 0.3);
-  --moon-glow-mid: rgba(93, 100, 117, 0.06);
+  --moon-glow: rgba(93, 100, 117, 0.26);
+  --moon-glow-mid: rgba(93, 100, 117, 0.05);
+  --moon-lit: #5d6475;
+  --moon-shade: #23262c;
+  --star: #2e323a;
   --btn-drop: 0 10px 14px rgba(93, 100, 117, 0.3);
   --danger-bg: #fde4e9;
 }

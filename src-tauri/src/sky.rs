@@ -87,6 +87,79 @@ pub(crate) fn local_sky_faces(root: &Path) -> BTreeMap<String, String> {
     faces
 }
 
+/// Names of the enabled profiles that carry at least one sky face, in any layout.
+pub(crate) fn profiles_with_sky(root: &Path) -> Vec<String> {
+    let Ok(entries) = fs::read_dir(root) else { return Vec::new() };
+    let mut names: Vec<String> = entries
+        .filter_map(|e| e.ok())
+        .map(|e| e.path())
+        .filter(|p| p.is_dir())
+        .filter_map(|p| p.file_name().map(|n| n.to_string_lossy().to_string()))
+        .filter(|n| !n.starts_with(crate::mods::DISABLED_PREFIX))
+        .filter(|n| {
+            SKY_DIRS.iter().any(|dir| {
+                FACE_KEYS.iter().any(|key| root.join(n).join(dir).join(format!("sky512_{key}.tex")).is_file())
+            })
+        })
+        .collect();
+    names.sort();
+    names
+}
+
+/// Decodes a BC1/DXT1 DDS (the format `.tex` sky faces are in) into an RGB image, so a
+/// face can be previewed. Anything else (other formats, a truncated file) gives `None`.
+pub(crate) fn decode_bc1_dds(bytes: &[u8]) -> Option<image::RgbImage> {
+    if bytes.len() < 128 || &bytes[0..4] != b"DDS " || &bytes[84..88] != b"DXT1" {
+        return None;
+    }
+    let h = u32::from_le_bytes(bytes[12..16].try_into().ok()?) as usize;
+    let w = u32::from_le_bytes(bytes[16..20].try_into().ok()?) as usize;
+    if w == 0 || h == 0 || w > 8192 || h > 8192 {
+        return None;
+    }
+    let (bw, bh) = ((w + 3) / 4, (h + 3) / 4);
+    if bytes.len() < 128 + bw * bh * 8 {
+        return None;
+    }
+    let expand = |c: u16| -> [u32; 3] {
+        [
+            ((c >> 11) & 31) as u32 * 255 / 31,
+            ((c >> 5) & 63) as u32 * 255 / 63,
+            (c & 31) as u32 * 255 / 31,
+        ]
+    };
+    let mut img = image::RgbImage::new(w as u32, h as u32);
+    for by in 0..bh {
+        for bx in 0..bw {
+            let off = 128 + (by * bw + bx) * 8;
+            let c0 = u16::from_le_bytes([bytes[off], bytes[off + 1]]);
+            let c1 = u16::from_le_bytes([bytes[off + 2], bytes[off + 3]]);
+            let bits = u32::from_le_bytes([bytes[off + 4], bytes[off + 5], bytes[off + 6], bytes[off + 7]]);
+            let (p0, p1) = (expand(c0), expand(c1));
+            let mut pal = [p0, p1, [0; 3], [0; 3]];
+            for i in 0..3 {
+                if c0 > c1 {
+                    pal[2][i] = (2 * p0[i] + p1[i]) / 3;
+                    pal[3][i] = (p0[i] + 2 * p1[i]) / 3;
+                } else {
+                    pal[2][i] = (p0[i] + p1[i]) / 2;
+                    pal[3][i] = 0;
+                }
+            }
+            for py in 0..4 {
+                for px in 0..4 {
+                    let (x, y) = (bx * 4 + px, by * 4 + py);
+                    if x < w && y < h {
+                        let c = pal[((bits >> (2 * (py * 4 + px))) & 3) as usize];
+                        img.put_pixel(x as u32, y as u32, image::Rgb([c[0] as u8, c[1] as u8, c[2] as u8]));
+                    }
+                }
+            }
+        }
+    }
+    Some(img)
+}
+
 /// What is really applied right now. Luna's settings remember the names
 /// of the font / faces it installed, but that memory goes stale the moment
 /// the profile is switched off, deleted or emptied elsewhere — so the files
@@ -307,6 +380,36 @@ mod tests {
         assert_eq!(sky_face_of("content/sky/sky512_dn.tex"), Some((SKY_DIRS[2], "dn")));
         assert_eq!(sky_face_of("content/sky/readme.txt"), None);
         assert_eq!(sky_face_of("content/fonts/sky512_up.tex"), None);
+    }
+
+    #[test]
+    fn bc1_round_trips_through_our_own_encoder() {
+        // a 4x4 solid red image -> our DDS -> decoded back
+        let mut src = image::RgbaImage::new(8, 8);
+        for p in src.pixels_mut() {
+            *p = image::Rgba([250, 10, 10, 255]);
+        }
+        let dds = encode_sky_image(&image::DynamicImage::ImageRgba8(src));
+        let img = decode_bc1_dds(&dds).expect("our own DDS decodes");
+        assert_eq!(img.dimensions(), (512, 512));
+        let px = img.get_pixel(100, 100);
+        assert!(px[0] > 230 && px[1] < 40 && px[2] < 40, "got {px:?}");
+        assert!(decode_bc1_dds(b"not a dds").is_none());
+    }
+
+    #[test]
+    fn profiles_with_sky_lists_only_enabled_ones() {
+        let root = temp("withsky");
+        let on = root.join("Sky A").join("content/sky");
+        let off = root.join("_disabled_Sky B").join("content/sky");
+        let none = root.join("Fonts").join("content/fonts");
+        for d in [&on, &off, &none] {
+            fs::create_dir_all(d).unwrap();
+        }
+        fs::write(on.join("sky512_up.tex"), b"x").unwrap();
+        fs::write(off.join("sky512_up.tex"), b"x").unwrap();
+        assert_eq!(profiles_with_sky(&root), vec!["Sky A".to_string()]);
+        let _ = fs::remove_dir_all(&root);
     }
 
     #[test]

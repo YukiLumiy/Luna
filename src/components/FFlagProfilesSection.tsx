@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { notifyFlagsChanged } from "../flagEvents";
+import { StatusLine } from "./StatusLine";
 import { useT } from "../i18n";
+import { useArmed } from "../useArmed";
 
 interface Profile {
   name: string;
@@ -15,6 +17,7 @@ export function FFlagProfilesSection() {
   const [name, setName] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { armed, arm, disarm } = useArmed();
 
   const refresh = () =>
     invoke<Profile[]>("list_fflag_profiles").then(setProfiles).catch((err) => setError(String(err)));
@@ -56,23 +59,35 @@ export function FFlagProfilesSection() {
             {t("common.save")}
           </button>
         </div>
-        {profiles.map((p) => (
-          <div className="profile-row" key={p.name}>
-            <span className="field-label">
-              {p.name} <span className="appearance-hint">{t("fprofiles.count", { n: p.count })}</span>
-            </span>
-            <span className="profile-actions">
-              <button className="apply-btn" onClick={() => run("load_fflag_profile", { name: p.name }, t("fprofiles.loaded", { name: p.name }), true)}>
-                {t("common.load")}
-              </button>
-              <button className="apply-btn" onClick={() => run("delete_fflag_profile", { name: p.name }, t("fprofiles.deleted", { name: p.name }))}>
-                {t("common.delete")}
-              </button>
-            </span>
-          </div>
-        ))}
-        {message && <p className="appearance-hint">{message}</p>}
-        {error && <p className="flag-error">{error}</p>}
+        {profiles.length > 0 && (
+          <ul className="fprofile-list">
+            {profiles.map((p) => (
+              <li className="fprofile-row" key={p.name}>
+                <span className="fprofile-name" title={p.name}>
+                  <span className="fprofile-label">{p.name}</span>
+                  <span className="fprofile-count">{t("fprofiles.count", { n: p.count })}</span>
+                </span>
+                <span className="fprofile-actions">
+                  <button className="apply-btn" onClick={() => run("load_fflag_profile", { name: p.name }, t("fprofiles.loaded", { name: p.name }), true)}>
+                    {t("common.load")}
+                  </button>
+                  <button
+                    className={`apply-btn ${armed === p.name ? "apply-btn--danger" : ""}`}
+                    data-armed={armed === p.name}
+                    onClick={() => {
+                      if (armed !== p.name) return arm(p.name);
+                      disarm();
+                      void run("delete_fflag_profile", { name: p.name }, t("fprofiles.deleted", { name: p.name }));
+                    }}
+                  >
+                    {armed === p.name ? t("profiles.deleteConfirm") : t("common.delete")}
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+        <StatusLine text={error ?? message} error={Boolean(error)} />
       </div>
     </section>
   );

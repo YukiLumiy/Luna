@@ -36,10 +36,14 @@ export function setLang(lang: Lang) {
   listeners.forEach((fn) => fn());
 }
 
-/** Looks a string up in the current language; `{name}` placeholders are filled from `vars`. */
+/** Looks a string up in the current language; `{name}` placeholders are filled from `vars`, and `{n?one|other}` picks a plural form. */
 export function t(key: Key, vars?: Record<string, string | number>): string {
   let text = dict[current][key] ?? dict.en[key] ?? key;
-  if (vars) text = text.replace(/\{(\w+)\}/g, (_, k) => (k in vars ? String(vars[k]) : `{${k}}`));
+  if (vars) {
+    // "{n?file|files}": the first form when n is 1, the second otherwise
+    text = text.replace(/\{(\w+)\?([^|}]*)\|([^}]*)\}/g, (_, k, one, many) => (Number(vars[k]) === 1 ? one : many));
+    text = text.replace(/\{(\w+)\}/g, (_, k) => (k in vars ? String(vars[k]) : `{${k}}`));
+  }
   return text;
 }
 
