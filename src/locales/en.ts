@@ -95,6 +95,17 @@ export const en = {
   "update.startupToggle": "Toggle checking for updates on startup",
 
   // skybox fix
+  "skyfix.heading": "Skybox Fix",
+  "skyfix.hint": "Repairs Roblox skybox rendering issues.",
+  "skyfix.applyBtn": "Apply fix",
+  "skyfix.applied": "Applied the fix to {n} files.",
+  "skyfix.removed": "Removed the fix from {n} files.",
+  "skyfix.all": "All {total} files are fixed.",
+  "skyfix.partial": "{present} of {total} files are fixed.",
+  "skyfix.none": "No files are currently fixed.",
+  "skyfix.onLaunch": "Apply on launch",
+  "skyfix.onLaunchHint": "Automatically apply the skybox fix when launching Roblox.",
+  "skyfix.onLaunchToggle": "Toggle automatic skybox fix on launch",
 
   // fastflag presets
   "presets.heading": "FastFlag presets",
