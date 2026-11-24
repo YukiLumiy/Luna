@@ -13,7 +13,8 @@ import { applyTheme } from "./theme";
 import { TooltipLayer } from "./components/TooltipLayer";
 import { UpdateToast } from "./components/UpdateToast";
 import { PatchNotes } from "./components/PatchNotes";
-import { autoUpdateEnabled, checkForUpdate, takePatchNotes } from "./updater";
+import { autoUpdateEnabled, checkForUpdate, isFirstStartAfterUpdate } from "./updater";
+import { patchNotesFor, type PatchEntry } from "./patchNotes";
 import { getVersion } from "@tauri-apps/api/app";
 
 type LaunchState = "idle" | "launching" | "running" | "error";
@@ -29,7 +30,8 @@ export default function App() {
   const [linked, setLinked] = useState<boolean | null>(null);
   const alive = useRef(true);
   // Release notes, shown once on the first start after an update.
-  const [notes, setNotes] = useState<{ version: string; notes: string } | null>(null);
+  const [notes, setNotes] = useState<PatchEntry | null>(null);
+  const [appVersion, setAppVersion] = useState("");
 
   const refreshProtocol = useCallback(() => {
     api.protocolStatus().then((s) => alive.current && setLinked(s.registered_to_luna)).catch(() => alive.current && setLinked(null));
@@ -58,7 +60,11 @@ export default function App() {
     if (startupChecked.current) return; // StrictMode runs effects twice in development
     startupChecked.current = true;
     getVersion()
-      .then((v) => setNotes(takePatchNotes(v)))
+      .then(async (v) => {
+        setAppVersion(v);
+        // the notes are part of the app (patchNotes.json); shown once, on the first start after an update
+        if (await isFirstStartAfterUpdate(v)) setNotes(patchNotesFor(v));
+      })
       .catch(() => undefined);
     // Quietly ask whether a newer release exists; the toast (top right) appears if so.
     if (autoUpdateEnabled()) void checkForUpdate(true);
@@ -96,7 +102,7 @@ export default function App() {
       {/* home screen only — Settings has its own Updates card */}
       {view === "home" && <UpdateToast />}
       <TooltipLayer />
-      {notes && <PatchNotes version={notes.version} notes={notes.notes} onClose={() => setNotes(null)} />}
+      {notes && <PatchNotes title={t("update.whatsNew", { v: notes.version })} entries={[notes]} onClose={() => setNotes(null)} />}
 
       <div className="screen-viewport" data-view={view}>
         <div key={view} className={`screen screen--${direction}`}>
@@ -119,6 +125,7 @@ export default function App() {
 
               <div className="footer">
                 <StatusPill tone={linked ? "live" : "neutral"}>{linked === null ? "…" : linked ? t("home.linked") : t("home.notLinked")}</StatusPill>
+                {appVersion && <span className="version-tag">v{appVersion}</span>}
               </div>
             </>
           )}

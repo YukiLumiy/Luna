@@ -42,3 +42,5 @@ tauri.conf.json の updater の endpoints は YukiLumiy/Luna を仮置きして�
 - 削除の「Delete?」は useArmed.ts（別の場所をクリック / Esc / 数秒で × に戻る）。ツールチップは TooltipLayer.tsx（title 属性を自動で置き換え）。アップデート通知は UpdateToast.tsx、更新後の初回だけ PatchNotes.tsx（本文は RELEASE_NOTES.md がリリース本文になる）
 - 色は `tools/genpal.py` で生成（palettes.css）。色を足す・調整するときはここの表を編集して実行
 - Skybox fix は設定画面から削除。スカイボックスの適用・リセット・プロファイルの ON/OFF/削除・Roblox 起動のたびに skyfix::sync_with_skybox が自動で適用/解除（スカイボックスを持つ有効なプロファイルがあれば適用、なければ解除）
+- バージョン: タグ名がそのままビルドのバージョンになる（Actions が scripts/set-version.mjs で package.json / tauri.conf.json / Cargo.toml / Cargo.lock を書き換える）。インストーラ名・アプリ内表示・アップデータの比較が常に一致する
+- パッチノートは src/patchNotes.json（アプリに組み込み）。更新後の初回起動に1回だけ表示、設定 → Updates → Patch notes でいつでも閲覧。GitHub の Release 本文も同じ文面（scripts/release-notes.mjs）。新バージョンを出すときは先にここへ追記する（無いとビルドが失敗する）

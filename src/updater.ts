@@ -2,6 +2,7 @@ import { useSyncExternalStore } from "react";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { getVersion } from "@tauri-apps/api/app";
+import { invoke } from "@tauri-apps/api/core";
 
 export type UpdateState =
   | { kind: "idle" }
@@ -70,40 +71,31 @@ export async function checkForUpdate(quiet = false) {
   }
 }
 
-const NOTES_KEY = "luna.pendingNotes";
 const SEEN_KEY = "luna.lastVersion";
 
 /**
- * The patch notes to show once, on the first start after an update. They are saved just
- * before installing (the updater hands them over with the update), and shown only if the
- * running version is the one they were saved for. A fresh install, or an update that
- * brought no notes, shows nothing. Every version is "seen" exactly once.
+ * Decides whether the patch notes should be shown now: only on the first start after the
+ * version changed (an update), never on later starts and not on a first install. Every start
+ * records the running version, so each version is "seen" exactly once. The one gap: builds that
+ * didn't record versions yet (before 0.1.2) leave nothing to compare with; then Luna having been
+ * used before (its settings file exists) means this start follows an update.
  */
-export function takePatchNotes(current: string): { version: string; notes: string } | null {
+export async function isFirstStartAfterUpdate(current: string): Promise<boolean> {
+  let last: string | null = null;
   try {
-    const last = localStorage.getItem(SEEN_KEY);
+    last = localStorage.getItem(SEEN_KEY);
     localStorage.setItem(SEEN_KEY, current);
-    if (last === null || last === current) return null;
-    const saved = JSON.parse(localStorage.getItem(NOTES_KEY) ?? "null") as { version?: string; notes?: string } | null;
-    if (saved?.version === current && saved.notes?.trim()) {
-      localStorage.removeItem(NOTES_KEY);
-      return { version: current, notes: saved.notes };
-    }
   } catch {
-    // storage unavailable or corrupt: just skip the notes
+    return false; // can't remember anything: never nag
   }
-  return null;
+  if (last === null) return invoke<boolean>("had_previous_use").catch(() => false);
+  return isNewer(current, last);
 }
 
 /** Downloads and runs the installer; Luna closes and the new version starts. */
 export async function installUpdate() {
   if (!pending) return;
   const version = pending.version;
-  try {
-    localStorage.setItem(NOTES_KEY, JSON.stringify({ version, notes: pending.body ?? "" }));
-  } catch {
-    // no notes after the update, then
-  }
   let total = 0;
   let received = 0;
   set({ kind: "downloading", version, percent: null });

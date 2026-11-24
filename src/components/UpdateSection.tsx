@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import { ToggleSwitch } from "./ToggleSwitch";
 import { useT } from "../i18n";
+import { PatchNotes } from "./PatchNotes";
+import { allPatchNotes } from "../patchNotes";
 import { autoUpdateEnabled, checkForUpdate, installUpdate, setAutoUpdate, useUpdateState } from "../updater";
 
 /** Shows the installed version, checks GitHub for a newer one, and installs it. */
@@ -10,6 +12,7 @@ export function UpdateSection() {
   const s = useUpdateState();
   const [version, setVersion] = useState("");
   const [auto, setAuto] = useState(autoUpdateEnabled());
+  const [showNotes, setShowNotes] = useState(false);
 
   useEffect(() => {
     getVersion().then(setVersion).catch(() => undefined);
@@ -46,6 +49,9 @@ export function UpdateSection() {
             </button>
           )}
         </div>
+        <button className="reset-btn flag-reset-all" onClick={() => setShowNotes(true)}>
+          {t("update.viewNotes")}
+        </button>
       </div>
       <div className="field-row">
         <div className="field-text">
@@ -61,6 +67,7 @@ export function UpdateSection() {
           }}
         />
       </div>
+      {showNotes && <PatchNotes title={t("update.notesTitle")} entries={allPatchNotes()} onClose={() => setShowNotes(false)} />}
     </section>
   );
 }

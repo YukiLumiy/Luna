@@ -65,6 +65,7 @@ fn main() {
             settings::get_settings,
             settings::update_settings,
             settings::set_skybox_fix_on_launch,
+            settings::had_previous_use,
             skyfix::get_skybox_fix_status,
             skyfix::apply_skybox_fix,
             skyfix::remove_skybox_fix,

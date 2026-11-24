@@ -82,6 +82,14 @@ pub fn get_settings() -> Result<LunaSettings, String> {
     serde_json::from_str(&raw).map_err(|e| e.to_string())
 }
 
+/// True if Luna has been used on this PC before (its settings file exists). The UI uses it,
+/// the first time a version number is recorded, to tell a first install (no patch notes) from
+/// an update of a build that didn't record versions yet (show them).
+#[tauri::command]
+pub fn had_previous_use() -> bool {
+    settings_path().map(|p| p.is_file()).unwrap_or(false)
+}
+
 #[tauri::command]
 pub fn update_settings(settings: LunaSettings) -> Result<(), String> {
     let path = settings_path()?;

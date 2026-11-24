@@ -33,7 +33,9 @@
   .welcome-status--busy { animation: status-breathe 1.6s ease-in-out infinite; }
   @keyframes status-breathe { 0%, 100% { opacity: 0.65; } 50% { opacity: 1; } }
   .actions { display: flex; flex-direction: column; gap: 4px; }
-  .footer { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 18px 0 26px; position: relative; flex-shrink: 0; }
+  .footer { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; padding: 14px 0 14px; position: relative; flex-shrink: 0; }
+  /* the running version, small, at the bottom of the home screen (secondary text colour: readable in every palette, dark and light) */
+  .version-tag { font-size: 10.5px; font-weight: 600; letter-spacing: 0.04em; line-height: 1; color: var(--ink-faint); user-select: none; }
 
 /* ---- HeroBackground.tsx ---- */
         .hero { position: relative; isolation: isolate; flex: 1; min-height: 0; display: grid; grid-template-rows: 50% 50%; overflow: hidden;
@@ -449,23 +451,39 @@
       
 
 /* ---- FFlagPresetsSection.tsx ---- */
-        .preset-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-        .preset-chip {
+        /* The options of one setting are a single framed control. The frame's colour shows
+           through the 1px gaps between the options as divider lines (also where a long set wraps
+           onto a second row); the selected option is filled. */
+        .preset-chips {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 1px;
+          background: var(--line-strong);
           border: 1px solid var(--line-strong);
-          background: transparent;
+          border-radius: 13px;
+          overflow: hidden;
+        }
+        .preset-chip {
+          --swell: 1; /* no swelling: the options sit edge to edge */
+          flex: 1 1 auto;
+          min-width: 0;
+          height: 32px;
+          padding: 0 8px;
+          border: 0;
+          border-radius: 0;
+          background: var(--bg-canvas);
           color: var(--ink-muted);
           font-size: 11.5px;
           font-weight: 600;
-          padding: 5px 13px;
-          border-radius: var(--radius-pill);
-          transition: background 200ms ease, color 200ms ease, transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
+          white-space: nowrap;
+          transition: background 200ms ease, color 200ms ease;
         }
-        .preset-chip:hover { color: var(--ink); transform: translateY(-1px); }
-        .preset-chip--on { background: var(--ember-gradient); color: var(--ink-on-ember); border-color: transparent; }
-        /* hover/focus lights the label of an unselected chip; the selected one sits on the
-           accent fill, so its label must stay the dark-on-accent colour (it used to go near-white). */
+        .preset-chip:hover { color: var(--ink); background: var(--bg-surface-hover); }
+        .preset-chip:focus-visible { outline-offset: -3px; }
+        .preset-chip--on, .preset-chip--on:hover { background: var(--ember-gradient); color: var(--ink-on-ember); }
+        /* hover/focus lights the label of an unselected option; the selected one sits on the
+           accent fill, so its label stays the dark-on-accent colour (it used to go near-white). */
         .preset-chip--on:is(:hover, :focus, :focus-visible) { color: var(--ink-on-ember); }
-      
 
 /* ---- FastFlagsSection.tsx ---- */
         .flag-error {
@@ -939,3 +957,6 @@
 .modal-body p { margin: 0 0 8px; }
 .modal-body ul { margin: 0 0 8px; padding-left: 18px; }
 .modal-body li { margin-bottom: 3px; }
+
+.modal-entry + .modal-entry { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.modal-version { margin: 0 0 6px; font-size: 12.5px; font-weight: 800; color: var(--moon-text); }

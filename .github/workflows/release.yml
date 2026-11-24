@@ -31,21 +31,25 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+      # Build as the version of the tag, whatever the files in the commit say: this sets
+      # package.json, tauri.conf.json, Cargo.toml and Cargo.lock, which decides the installer's
+      # file name, the version Luna shows and the version the updater compares.
+      - name: Set the version from the tag
+        shell: bash
+        run: node scripts/set-version.mjs "$GITHUB_REF_NAME"
       - uses: dtolnay/rust-toolchain@stable
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
       - run: pnpm install --frozen-lockfile
-      # The text of RELEASE_NOTES.md becomes the release's body, which the updater delivers with
-      # the update — Luna shows it once, on the first start after updating. Edit that file
-      # before tagging a release.
+      # The release's text is this version's entry in src/patchNotes.json (the same text the app
+      # shows after the update). The build fails here if the entry is missing.
       - id: notes
         shell: bash
         run: |
           {
             echo 'body<<NOTES_EOF'
-            cat RELEASE_NOTES.md
-            echo
+            node scripts/release-notes.mjs "$GITHUB_REF_NAME"
             echo 'NOTES_EOF'
           } >> "$GITHUB_OUTPUT"
       - uses: tauri-apps/tauri-action@v0
