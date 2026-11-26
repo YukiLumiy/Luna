@@ -46,6 +46,10 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             launch::apply_mods_and_launch,
             launch::cancel_bootstrap,
+            activity::get_server_status,
+            activity::refresh_server_status,
+            bootstrap::get_roblox_install,
+            bootstrap::reinstall_roblox,
             protocol::get_protocol_status,
             protocol::register_protocol_handler,
             protocol::restore_protocol_handler,

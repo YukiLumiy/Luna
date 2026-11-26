@@ -1,0 +1,11 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "popup",
+  "description": "Capabilities for the game card window",
+  "windows": [
+    "popup-*"
+  ],
+  "permissions": [
+    "core:window:allow-close"
+  ]
+}

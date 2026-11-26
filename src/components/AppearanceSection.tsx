@@ -3,6 +3,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { useT, type Key } from "../i18n";
 import { useArmed } from "../useArmed";
+import { useOutsideDismiss } from "../useOutsideDismiss";
 import { StatusLine } from "./StatusLine";
 
 type FaceKey = "up" | "dn" | "ft" | "bk" | "lf" | "rt";
@@ -298,7 +299,8 @@ export function AppearanceSection({ onApplied, syncKey = 0 }: AppearanceSectionP
     setRenameDraft(name);
   }
 
-  async function commitRenameMine(oldName: string) {
+  /** `leave`: the person clicked elsewhere, so the mode ends even if the name was refused. */
+  async function commitRenameMine(oldName: string, leave = false) {
     const next = renameDraft.trim();
     if (!next || next === oldName) {
       setRenaming(null);
@@ -312,8 +314,14 @@ export function AppearanceSection({ onApplied, syncKey = 0 }: AppearanceSectionP
       void refreshState();
     } catch (err) {
       setSkyStatus(String(err));
+      if (leave) setRenaming(null);
     }
   }
+
+  // Clicking anywhere else ends the rename (keeping the new name if it is a valid one).
+  useOutsideDismiss(renaming !== null, () => {
+    if (renaming !== null) void commitRenameMine(renaming, true);
+  });
 
   // A template is "active" while all six faces still carry its name.
   const activePreset = presets.find((p) =>
@@ -488,6 +496,7 @@ export function AppearanceSection({ onApplied, syncKey = 0 }: AppearanceSectionP
                     {editing ? (
                       <input
                         className="flag-input sky-mine-rename"
+                        data-editing="true"
                         value={renameDraft}
                         autoFocus
                         maxLength={40}
@@ -512,10 +521,10 @@ export function AppearanceSection({ onApplied, syncKey = 0 }: AppearanceSectionP
                     )}
                     {editing ? (
                       <>
-                        <button className="icon-btn" aria-label={t("common.save")} title={t("common.save")} onClick={() => commitRenameMine(p.name)}>
+                        <button className="icon-btn" data-editing="true" aria-label={t("common.save")} title={t("common.save")} onClick={() => commitRenameMine(p.name)}>
                           <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3.2 3.2L13 4.8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
                         </button>
-                        <button className="icon-btn" aria-label={t("common.cancel")} title={t("common.cancel")} onClick={() => setRenaming(null)}>
+                        <button className="icon-btn" data-editing="true" aria-label={t("common.cancel")} title={t("common.cancel")} onClick={() => setRenaming(null)}>
                           <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
                         </button>
                       </>

@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { notifyFlagsChanged, onFlagsChanged } from "../flagEvents";
 import { useT } from "../i18n";
 import { useArmed } from "../useArmed";
+import { useOutsideDismiss } from "../useOutsideDismiss";
 
 type FlagValue = string | number | boolean;
 type FlagMap = Record<string, FlagValue>;
@@ -106,6 +107,13 @@ export function FastFlagsSection() {
     void persist(next);
   }
 
+  // Clicking anywhere else ends the edit: the change is kept if it is valid, dropped if not.
+  useOutsideDismiss(editing !== null, () => {
+    const key = draftKey.trim();
+    if (editing !== null && key && (key === editing || !(key in flags))) saveEdit();
+    else cancelEdit();
+  });
+
   const entries = Object.entries(flags);
 
   return (
@@ -125,7 +133,7 @@ export function FastFlagsSection() {
       {entries.length > 0 && (
         <ul className="flag-list">
           {entries.map(([key, value]) => (
-            <li key={key} className={`flag-row ${editing === key ? "flag-row--editing" : ""}`}>
+            <li key={key} className={`flag-row ${editing === key ? "flag-row--editing" : ""}`} data-editing={editing === key ? "true" : undefined}>
               {editing === key ? (
                 <>
                   <div className="flag-edit-fields">

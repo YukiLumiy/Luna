@@ -1,3 +1,4 @@
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { t } from "../i18n";
 import { MoonDisc } from "./MoonEmblem";
 
@@ -5,6 +6,10 @@ export interface PopupData {
   game: string;
   place: string | null;
   theme: string;
+  ping_ms: number | null;
+  players: number | null;
+  max_players: number | null;
+  playing: number | null;
 }
 
 declare global {
@@ -23,8 +28,23 @@ const Pin = () => (
 
 /** The card at the bottom right of the screen when a game is joined (its own transparent window). */
 export function Popup({ data }: { data: PopupData }) {
+  const ping = data.ping_ms;
+  const pingClass = ping === null ? "" : ping < 70 ? "popup-chip--good" : ping < 140 ? "popup-chip--ok" : "popup-chip--bad";
+  const crowd =
+    data.players !== null && data.max_players !== null
+      ? t("popup.players", { n: data.players, max: data.max_players })
+      : data.playing !== null
+        ? t("popup.playing", { n: data.playing.toLocaleString() })
+        : null;
   return (
-    <div className="game-popup" role="status">
+    <div
+      className="game-popup"
+      role="status"
+      // The card closes its own window once it has faded out, however long its page took to start.
+      onAnimationEnd={(e) => {
+        if (e.target === e.currentTarget && e.animationName === "popup-out") void getCurrentWindow().close().catch(() => undefined);
+      }}
+    >
       <div className="game-popup-moon" aria-hidden>
         <svg className="game-popup-halo" viewBox="0 0 100 100">
           <circle cx="50" cy="50" r="47" fill="none" stroke="currentColor" strokeOpacity="0.7" strokeWidth="1.6" strokeDasharray="1.5 7" strokeLinecap="round" />
@@ -40,6 +60,17 @@ export function Popup({ data }: { data: PopupData }) {
           <Pin />
           <span>{data.place ? t("popup.server", { place: data.place }) : t("popup.noLocation")}</span>
         </span>
+        {(ping !== null || crowd) && (
+          <span className="game-popup-chips">
+            {ping !== null && (
+              <span className={`popup-chip ${pingClass}`}>
+                <i aria-hidden />
+                {t("popup.ping", { ms: ping })}
+              </span>
+            )}
+            {crowd && <span className="popup-chip">{crowd}</span>}
+          </span>
+        )}
       </div>
       <span className="game-popup-timer" aria-hidden />
     </div>

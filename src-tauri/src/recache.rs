@@ -9,7 +9,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde::Serialize;
-use sysinfo::System;
 
 use crate::paths::{luna_state_dir, roblox_local_dir};
 
@@ -132,10 +131,6 @@ fn restore_files() -> Result<u64, String> {
     Ok(copied)
 }
 
-fn roblox_running() -> bool {
-    crate::cache::is_roblox_running(&mut System::new())
-}
-
 /// Before a launch: if the live cache is gone or nearly empty (cleared, or reset
 /// by an update) and a copy exists, bring the copy back.
 pub(crate) fn restore_if_empty() -> Result<u64, String> {
@@ -169,8 +164,8 @@ pub async fn get_recache_status() -> Result<RecacheStatus, String> {
 /// Settings -> ReCache -> "Save now". Returns the bytes newly copied.
 #[tauri::command]
 pub async fn recache_save() -> Result<u64, String> {
-    if roblox_running() {
-        return Err("Roblox is running — close it first.".into());
+    if let Some(message) = crate::cache::running_message("save the copy") {
+        return Err(message);
     }
     save_snapshot_files()
 }
@@ -178,8 +173,8 @@ pub async fn recache_save() -> Result<u64, String> {
 /// Settings -> ReCache -> "Restore now". Returns the bytes copied back.
 #[tauri::command]
 pub async fn recache_restore() -> Result<u64, String> {
-    if roblox_running() {
-        return Err("Roblox is running — close it first.".into());
+    if let Some(message) = crate::cache::running_message("restore the copy") {
+        return Err(message);
     }
     if !snapshot_dir()?.join(STAMP).is_file() {
         return Err("There is no saved copy yet.".into());

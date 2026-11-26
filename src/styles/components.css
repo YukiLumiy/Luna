@@ -231,13 +231,26 @@
           border: none;
           border-radius: 0;
           clip-path: var(--poly-clip-sm);
-          background: var(--ember-gradient);
+          /* The accent fill is its own layer (::before) so it can fade out when the button is
+             disabled: a gradient can't be transitioned into a flat colour, an opacity can. */
+          position: relative;
+          isolation: isolate;
+          background: var(--bg-surface-hover);
           color: var(--ink-on-ember);
           font-size: 12.5px;
           font-weight: 800;
           white-space: nowrap;
-          transition: filter 120ms ease, opacity 120ms ease, transform 100ms ease;
+          transition: filter 120ms ease, opacity 120ms ease, transform 100ms ease, color 320ms ease;
         }
+        .apply-btn::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          z-index: -1;
+          background: var(--ember-gradient);
+          transition: opacity 320ms ease;
+        }
+        .apply-btn:disabled::before { opacity: 0; }
         .apply-btn:hover:not(:disabled) {
           filter: brightness(1.07);
         }
@@ -863,13 +876,15 @@
           align-items: center;
           justify-content: center;
           min-width: 26px;
+          width: 26px;
           height: 26px;
           padding: 0 4px;
           border: none;
           border-radius: 12px;
           background: transparent;
           color: var(--ink-faint);
-          transition: color 140ms ease, background 140ms ease;
+          overflow: hidden;
+          transition: color 140ms ease, background 140ms ease, width 280ms cubic-bezier(0.22, 1.1, 0.36, 1);
         }
         .icon-btn:hover:not(:disabled) {
           color: var(--ink);
@@ -883,6 +898,7 @@
         .icon-btn--danger:hover:not(:disabled) {
           color: var(--danger);
         }
+        .icon-btn--danger { width: auto; } /* grows to fit "Delete?" (interpolate-size, set on :root) */
         .icon-btn-text {
           font-size: 11px;
           font-weight: 700;
@@ -1021,7 +1037,7 @@
     var(--bg-surface);
   border: 1px solid var(--line-strong); border-radius: 22px;
   box-shadow: 0 18px 38px -12px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.03) inset;
-  animation: popup-in 640ms cubic-bezier(0.16, 1, 0.3, 1) backwards, popup-out 600ms ease-in-out 5250ms forwards;
+  animation: popup-in 640ms cubic-bezier(0.16, 1, 0.3, 1) backwards, popup-out 600ms ease-in-out 5700ms forwards;
 }
 /* the moon: the same low-poly disc as the home screen, in a slowly turning dotted ring */
 .game-popup-moon { position: relative; flex: none; width: 64px; height: 64px; display: grid; place-items: center; color: var(--halo); }
@@ -1041,12 +1057,21 @@
 }
 .game-popup-place span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .game-popup-place svg { flex: none; color: var(--ember-text); }
+.game-popup-chips { display: flex; gap: 6px; margin-top: 5px; animation-delay: 320ms; }
+.popup-chip {
+  display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; font-size: 11px; font-weight: 700;
+  color: var(--ink-muted); background: color-mix(in srgb, var(--ink) 8%, transparent); border-radius: 999px; white-space: nowrap;
+}
+.popup-chip i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.popup-chip--good { color: #4ade80; }
+.popup-chip--ok { color: #facc15; }
+.popup-chip--bad { color: var(--danger); }
 .game-popup-place--none { color: var(--ink-faint); font-weight: 500; }
 .game-popup-place--none svg { color: var(--ink-faint); }
 /* how long the card stays: a thin line that runs out */
 .game-popup-timer {
   position: absolute; left: 0; bottom: 0; height: 3px; width: 100%; transform-origin: left; background: var(--moon-gradient);
-  animation: popup-timer 5300ms linear 500ms both;
+  animation: popup-timer 5700ms linear 500ms both;
 }
 @keyframes popup-in { from { opacity: 0; translate: 64px 0; scale: 0.96; } }
 @keyframes popup-out { to { opacity: 0; } }
@@ -1054,3 +1079,40 @@
 @keyframes popup-moon-in { from { opacity: 0; rotate: -200deg; scale: 0.6; } }
 @keyframes popup-timer { to { transform: scaleX(0); } }
 @keyframes luna-spin { to { transform: rotate(360deg); } }
+
+/* ---- ServerSection.tsx ---- */
+.server-empty { margin: 8px 0 0; font-size: 12px; line-height: 1.5; color: var(--ink-faint); }
+.server-card {
+  display: flex; flex-direction: column; gap: 3px; margin-top: 8px; padding: 12px 14px;
+  background: var(--bg-canvas); border: 1px solid var(--line); border-radius: 16px;
+  transition: border-color 300ms ease, box-shadow 300ms ease;
+}
+.server-card--live { border-color: color-mix(in srgb, var(--ember) 55%, var(--line)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ember) 12%, transparent); }
+.server-card-head { display: flex; align-items: center; gap: 7px; font-size: 10.5px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); }
+.server-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-faint); transition: background 300ms ease; }
+.server-card--live .server-dot { background: #4ade80; box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.6); animation: server-pulse 1.8s ease-out infinite; }
+.server-card--live .server-card-head { color: var(--ink-muted); }
+.server-game { margin-top: 4px; font-size: 14.5px; font-weight: 800; line-height: 1.3; }
+.server-place { font-size: 12.5px; font-weight: 600; color: var(--ink-muted); }
+.server-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 2px; }
+.server-chip {
+  padding: 3px 9px; font-size: 11px; font-weight: 700; color: var(--ink-muted);
+  background: var(--bg-surface-hover); border-radius: 999px;
+}
+.server-chip--good { color: #4ade80; }
+.server-chip--ok { color: #facc15; }
+.server-chip--bad { color: var(--danger); }
+.server-chip--dim { color: var(--ink-faint); font-weight: 500; }
+.server-meta { font-size: 10.5px; color: var(--ink-faint); }
+.server-card .appearance-row { margin-top: 8px; }
+.server-recent { margin-top: 12px; }
+.server-recent-row {
+  display: flex; align-items: center; gap: 8px; padding: 7px 4px 7px 10px; margin-top: 4px;
+  border-radius: 12px; transition: background-color 180ms ease;
+  animation: row-in 340ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+.server-recent-row:hover { background: var(--bg-surface-hover); }
+.server-recent-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.server-recent-game { font-size: 12.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.server-recent-meta { font-size: 10.5px; color: var(--ink-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@keyframes server-pulse { to { box-shadow: 0 0 0 7px rgba(74, 222, 128, 0); } }

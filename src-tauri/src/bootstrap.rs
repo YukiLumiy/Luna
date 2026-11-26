@@ -534,6 +534,43 @@ pub async fn ensure_latest(
     Ok(Installed { dir, version: latest, updated })
 }
 
+/// What Settings -> Updates shows about the Roblox that Luna installed.
+#[derive(Serialize)]
+pub struct RobloxInstall {
+    /// `version-<hash>`, None when Luna has not installed Roblox yet.
+    version: Option<String>,
+    folder: Option<String>,
+}
+
+#[tauri::command]
+pub fn get_roblox_install() -> RobloxInstall {
+    match installed_version() {
+        Some((dir, version)) => RobloxInstall { version: Some(version), folder: Some(dir.display().to_string()) },
+        None => RobloxInstall { version: None, folder: None },
+    }
+}
+
+/// Settings -> Updates -> Reinstall Roblox: removes what Luna installed, so the next launch
+/// downloads a fresh, complete copy (the fix for a Roblox that no longer starts).
+#[tauri::command]
+pub fn reinstall_roblox() -> Result<(), String> {
+    if let Some(message) = crate::cache::running_message("reinstall it") {
+        return Err(message);
+    }
+    let versions = luna_versions_dir()?;
+    if versions.is_dir() {
+        for entry in fs::read_dir(&versions).map_err(|e| e.to_string())?.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name.starts_with("version-") || name.ends_with(".partial") || name == ".downloads" {
+                fs::remove_dir_all(entry.path())
+                    .map_err(|e| format!("Couldn't remove {name}: {e}"))?;
+            }
+        }
+    }
+    let _ = fs::remove_file(state_path()?);
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

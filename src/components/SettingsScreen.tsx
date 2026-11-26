@@ -8,8 +8,10 @@ import { RecacheSection } from "./RecacheSection";
 import { UpdateSection } from "./UpdateSection";
 import { FFlagPresetsSection } from "./FFlagPresetsSection";
 import { FFlagProfilesSection } from "./FFlagProfilesSection";
+import { ServerSection } from "./ServerSection";
 import { AdvancedSection } from "./AdvancedSection";
 import { useArmed } from "../useArmed";
+import { useOutsideDismiss } from "../useOutsideDismiss";
 
 interface ModProfileInfo {
   name: string;
@@ -69,8 +71,8 @@ export function SettingsScreen({ onBack, onProfilesChanged }: SettingsScreenProp
     setError(null);
   }
 
-  async function commitRename(oldName: string) {
-    if (draft.trim() === oldName) {
+  async function commitRename(oldName: string, leave = false) {
+    if (draft.trim() === oldName || (leave && !draft.trim())) {
       setRenaming(null);
       return;
     }
@@ -83,10 +85,16 @@ export function SettingsScreen({ onBack, onProfilesChanged }: SettingsScreenProp
       setAppearanceKey((k) => k + 1);
     } catch (err) {
       setError(String(err));
+      if (leave) setRenaming(null);
     } finally {
       setPending(null);
     }
   }
+
+  // Clicking anywhere else ends the rename (keeping the new name if it is a valid one).
+  useOutsideDismiss(renaming !== null, () => {
+    if (renaming !== null) void commitRename(renaming, true);
+  });
 
   async function handleDelete(name: string) {
     if (armed !== name) {
@@ -131,6 +139,7 @@ export function SettingsScreen({ onBack, onProfilesChanged }: SettingsScreenProp
       <FFlagPresetsSection />
       <FastFlagsSection />
       <FFlagProfilesSection />
+      <ServerSection />
       <AdvancedSection />
 
       <div className="profiles-heading-row">
@@ -163,6 +172,7 @@ export function SettingsScreen({ onBack, onProfilesChanged }: SettingsScreenProp
               {renaming === profile.name ? (
                 <input
                   className="profile-rename"
+                  data-editing="true"
                   value={draft}
                   autoFocus
                   spellCheck={false}
@@ -180,10 +190,10 @@ export function SettingsScreen({ onBack, onProfilesChanged }: SettingsScreenProp
             <div className="profile-actions">
               {renaming === profile.name ? (
                 <>
-                  <button className="icon-btn" aria-label={t("profiles.saveName")} title={t("common.save")} onClick={() => commitRename(profile.name)} disabled={pending === profile.name}>
+                  <button className="icon-btn" data-editing="true" aria-label={t("profiles.saveName")} title={t("common.save")} onClick={() => commitRename(profile.name)} disabled={pending === profile.name}>
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3.2 3.2L13 4.8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
                   </button>
-                  <button className="icon-btn" aria-label={t("common.cancel")} title={t("common.cancel")} onClick={() => setRenaming(null)}>
+                  <button className="icon-btn" data-editing="true" aria-label={t("common.cancel")} title={t("common.cancel")} onClick={() => setRenaming(null)}>
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
                   </button>
                 </>

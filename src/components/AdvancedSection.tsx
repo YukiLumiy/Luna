@@ -32,14 +32,6 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
-interface ServerLocation {
-  ip: string;
-  city: string | null;
-  region: string | null;
-  country: string | null;
-  isp: string | null;
-}
-
 /** Shown until the saved settings arrive, so the card has its final size from the first frame. */
 const DEFAULTS: LunaSettings = {
   release_channel: null,
@@ -58,9 +50,6 @@ export function AdvancedSection() {
   const [palette, setPalette] = useState<PaletteId>(savedPalette());
   const [channelInput, setChannelInput] = useState("");
   const [status, setStatus] = useState<string | null>(null);
-  const [serverLocation, setServerLocation] = useState<ServerLocation | null>(null);
-  const [serverError, setServerError] = useState<string | null>(null);
-  const [serverBusy, setServerBusy] = useState(false);
   const [cacheBusy, setCacheBusy] = useState(false);
   const [cacheMessage, setCacheMessage] = useState<string | null>(null);
   const [cacheError, setCacheError] = useState<string | null>(null);
@@ -102,20 +91,6 @@ export function AdvancedSection() {
       setCacheError(String(err));
     } finally {
       setCacheBusy(false);
-    }
-  }
-
-  async function checkServerLocation() {
-    setServerBusy(true);
-    setServerError(null);
-    try {
-      const result = await invoke<ServerLocation>("get_server_location");
-      setServerLocation(result);
-    } catch (err) {
-      setServerLocation(null);
-      setServerError(String(err));
-    } finally {
-      setServerBusy(false);
     }
   }
 
@@ -295,34 +270,6 @@ export function AdvancedSection() {
             {t("common.save")}
           </button>
         </div>
-      </div>
-
-      <div className="field-column">
-        <span className="field-label">{t("adv.server")}</span>
-        <p className="appearance-hint">
-          {t("adv.serverHint")}
-        </p>
-        <button
-          className="apply-btn apply-btn--full"
-          onClick={checkServerLocation}
-          disabled={serverBusy}
-        >
-          {serverBusy ? t("adv.serverChecking") : t("adv.serverCheck")}
-        </button>
-        {serverLocation && (
-          <div className="server-result">
-            <span className="server-result-line">
-              {[serverLocation.city, serverLocation.region, serverLocation.country]
-                .filter(Boolean)
-                .join(", ") || t("adv.serverUnknown")}
-            </span>
-            <span className="server-result-meta">
-              {serverLocation.ip}
-              {serverLocation.isp ? ` · ${serverLocation.isp}` : ""}
-            </span>
-          </div>
-        )}
-        {serverError && <p className="flag-error">{serverError}</p>}
       </div>
 
       {status && <p className="flag-error">{status}</p>}

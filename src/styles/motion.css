@@ -131,3 +131,14 @@ button:not(:disabled):not(.preset-chip):not(.sky-template):active { scale: calc(
 
 /* Release notes: the entries come one after another. */
 .modal-entry { animation: row-in 400ms cubic-bezier(0.16, 1, 0.3, 1) 140ms backwards; }
+
+/* ---- Switching between modes (v0.2.0): whatever appears when a row goes back to normal
+        (from "Delete?" or from renaming) arrives with a small animation. ---- */
+:root { interpolate-size: allow-keywords; } /* lets a button's width animate to `auto` */
+@keyframes swap-in { from { opacity: 0; scale: 0.6; } }
+@keyframes swap-fade { from { opacity: 0; translate: 0 4px; } }
+.icon-btn > svg, .icon-btn-text, .flag-icon > svg { animation: swap-in 280ms cubic-bezier(0.22, 1.2, 0.36, 1) backwards; }
+.sky-mine-apply, .sky-mine-rename, .sky-mine-count, .profile-name, .profile-rename, .profile-meta,
+.flag-key, .flag-value, .flag-edit-fields, .swap-label {
+  animation: swap-fade 260ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}

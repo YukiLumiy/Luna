@@ -47,16 +47,38 @@ fn face_file(dir: &Path, key: &str) -> PathBuf {
     dir.join(format!("sky512_{key}.tex"))
 }
 
-/// A saved skybox is previewed by one of its own faces (front if it has one, else the
-/// first it has), decoded from the stored `.tex` — so the preview always matches what is
-/// applied, whatever kind of file the face came from. Written as `thumb.jpg` in the preset.
-fn make_thumb(dir: &Path) {
-    for key in ["ft", "lf", "rt", "bk", "up", "dn"] {
-        let Ok(bytes) = fs::read(face_file(dir, key)) else { continue };
-        let Some(img) = decode_bc1_dds(&bytes) else { continue };
-        let thumb = image::DynamicImage::ImageRgb8(img).thumbnail(128, 128).to_rgb8();
-        if thumb.save_with_format(dir.join("thumb.jpg"), image::ImageFormat::Jpeg).is_ok() {
-            return;
+/// Marks a preset whose preview follows the current rule (see `make_thumb`); presets without
+/// it get their preview made again the next time the list is read.
+const THUMB_MARK: &str = "thumb.v2";
+
+/// The preview of a saved skybox: its front face (`ft`) when all six faces are saved; when
+/// some are missing, whichever face it has. `sources` are the image files the person picked
+/// just now (face key -> path): those are used as they are, which is sharper than the stored
+/// `.tex`; every other face is decoded from the stored `.tex`.
+fn make_thumb(dir: &Path, sources: &HashMap<String, String>) {
+    let present: Vec<&str> = FACE_KEYS.iter().copied().filter(|k| face_file(dir, k).is_file()).collect();
+    // `ft` first; if it is missing (or can't be read) any other face will do
+    let mut order = vec!["ft"];
+    order.extend(present.iter().copied().filter(|k| *k != "ft"));
+    for key in order {
+        if !present.contains(&key) {
+            continue;
+        }
+        let from_source = sources
+            .get(key)
+            .filter(|p| !p.to_ascii_lowercase().ends_with(".tex"))
+            .and_then(|p| image::open(p).ok())
+            .map(|img| img.thumbnail(128, 128).to_rgb8());
+        let thumb = from_source.or_else(|| {
+            let bytes = fs::read(face_file(dir, key)).ok()?;
+            let img = decode_bc1_dds(&bytes)?;
+            Some(image::DynamicImage::ImageRgb8(img).thumbnail(128, 128).to_rgb8())
+        });
+        if let Some(thumb) = thumb {
+            if thumb.save_with_format(dir.join("thumb.jpg"), image::ImageFormat::Jpeg).is_ok() {
+                let _ = fs::write(dir.join(THUMB_MARK), b"");
+                return;
+            }
         }
     }
 }
@@ -86,8 +108,8 @@ pub fn list_user_sky_presets() -> Result<Vec<UserPresetInfo>, String> {
             .filter(|k| face_file(&path, k).is_file())
             .map(|k| k.to_string())
             .collect();
-        if !path.join("thumb.jpg").is_file() {
-            make_thumb(&path); // presets saved before previews existed
+        if !path.join(THUMB_MARK).is_file() {
+            make_thumb(&path, &HashMap::new()); // saved before previews, or under an older rule
         }
         let thumb = fs::read(path.join("thumb.jpg"))
             .ok()
@@ -133,7 +155,7 @@ pub fn save_user_sky_preset(
     for (key, bytes) in &encoded {
         fs::write(face_file(&dir, key), bytes).map_err(|e| e.to_string())?;
     }
-    make_thumb(&dir);
+    make_thumb(&dir, &faces);
     Ok(name)
 }
 
@@ -229,5 +251,64 @@ mod tests {
         assert_eq!(base64(b"fo"), "Zm8=");
         assert_eq!(base64(b"foo"), "Zm9v");
         assert_eq!(base64(b"foobar"), "Zm9vYmFy");
+    }
+}
+
+#[cfg(test)]
+mod preview_tests {
+    use super::*;
+    use crate::sky::encode_sky_image;
+
+    fn face(dir: &Path, key: &str, rgb: [u8; 3]) {
+        let img = image::DynamicImage::ImageRgb8(image::RgbImage::from_pixel(8, 8, image::Rgb(rgb)));
+        fs::write(face_file(dir, key), encode_sky_image(&img)).unwrap();
+    }
+
+    fn thumb_pixel(dir: &Path) -> [u8; 3] {
+        let img = image::open(dir.join("thumb.jpg")).unwrap().to_rgb8();
+        let p = img.get_pixel(img.width() / 2, img.height() / 2);
+        [p[0], p[1], p[2]]
+    }
+
+    #[test]
+    fn the_preview_is_the_front_face_or_any_face() {
+        let root = std::env::temp_dir().join("luna-user-sky-test");
+        let _ = fs::remove_dir_all(&root);
+
+        // all six faces: the front one (red) is shown
+        let full = root.join("full");
+        fs::create_dir_all(&full).unwrap();
+        for key in FACE_KEYS {
+            face(&full, key, if key == "ft" { [250, 10, 10] } else { [10, 10, 250] });
+        }
+        make_thumb(&full, &HashMap::new());
+        let p = thumb_pixel(&full);
+        assert!(p[0] > 200 && p[2] < 80, "expected red, got {p:?}");
+
+        // some faces missing, and no front face: whichever one exists is shown
+        let partial = root.join("partial");
+        fs::create_dir_all(&partial).unwrap();
+        face(&partial, "lf", [10, 10, 250]);
+        make_thumb(&partial, &HashMap::new());
+        let p = thumb_pixel(&partial);
+        assert!(p[2] > 200 && p[0] < 80, "expected blue, got {p:?}");
+        assert!(partial.join(THUMB_MARK).is_file());
+    }
+
+    #[test]
+    fn other_dds_flavours_can_be_previewed() {
+        // a 4x4 DXT5 image: 16-byte block = 8 bytes of alpha, then the BC1-style colour block
+        let mut dds = vec![0u8; 128];
+        dds[0..4].copy_from_slice(b"DDS ");
+        dds[12..16].copy_from_slice(&4u32.to_le_bytes());
+        dds[16..20].copy_from_slice(&4u32.to_le_bytes());
+        dds[84..88].copy_from_slice(b"DXT5");
+        let mut block = vec![0xFFu8; 8]; // alpha
+        block.extend_from_slice(&0xF800u16.to_le_bytes()); // colour 0: pure red
+        block.extend_from_slice(&0xF800u16.to_le_bytes());
+        block.extend_from_slice(&[0, 0, 0, 0]); // every pixel uses colour 0
+        dds.extend(block);
+        let img = decode_bc1_dds(&dds).expect("DXT5 is previewable");
+        assert_eq!(img.get_pixel(1, 1).0, [255, 0, 0]);
     }
 }

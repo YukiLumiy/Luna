@@ -80,7 +80,9 @@ export function FFlagProfilesSection() {
                       void run("delete_fflag_profile", { name: p.name }, t("fprofiles.deleted", { name: p.name }));
                     }}
                   >
-                    {armed === p.name ? t("profiles.deleteConfirm") : t("common.delete")}
+                    <span key={armed === p.name ? "confirm" : "delete"} className="swap-label">
+                      {armed === p.name ? t("profiles.deleteConfirm") : t("common.delete")}
+                    </span>
                   </button>
                 </span>
               </li>

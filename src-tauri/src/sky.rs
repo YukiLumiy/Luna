@@ -106,19 +106,34 @@ pub(crate) fn profiles_with_sky(root: &Path) -> Vec<String> {
     names
 }
 
-/// Decodes a BC1/DXT1 DDS (the format `.tex` sky faces are in) into an RGB image, so a
-/// face can be previewed. Anything else (other formats, a truncated file) gives `None`.
+/// Decodes a DDS sky face (the format `.tex` sky faces are in) into an RGB image, so a face
+/// can be previewed. BC1/DXT1 is what Luna writes; DXT3/DXT5 (and the same formats behind a
+/// DX10 header) are read through their colour blocks, which is enough for a preview.
+/// Anything else (other formats, a truncated file) gives `None`.
 pub(crate) fn decode_bc1_dds(bytes: &[u8]) -> Option<image::RgbImage> {
-    if bytes.len() < 128 || &bytes[0..4] != b"DDS " || &bytes[84..88] != b"DXT1" {
+    if bytes.len() < 128 || &bytes[0..4] != b"DDS " {
         return None;
     }
+    // (where the pixel data starts, bytes per 4x4 block, offset of the colour block inside it)
+    let (data, block, color) = match &bytes[84..88] {
+        b"DXT1" => (128usize, 8usize, 0usize),
+        b"DXT3" | b"DXT5" => (128, 16, 8),
+        b"DX10" if bytes.len() >= 148 => {
+            match u32::from_le_bytes(bytes[128..132].try_into().ok()?) {
+                70 | 71 | 72 => (148, 8, 0),
+                73 | 74 | 75 | 76 | 77 | 78 => (148, 16, 8),
+                _ => return None,
+            }
+        }
+        _ => return None,
+    };
     let h = u32::from_le_bytes(bytes[12..16].try_into().ok()?) as usize;
     let w = u32::from_le_bytes(bytes[16..20].try_into().ok()?) as usize;
     if w == 0 || h == 0 || w > 8192 || h > 8192 {
         return None;
     }
     let (bw, bh) = ((w + 3) / 4, (h + 3) / 4);
-    if bytes.len() < 128 + bw * bh * 8 {
+    if bytes.len() < data + bw * bh * block {
         return None;
     }
     let expand = |c: u16| -> [u32; 3] {
@@ -131,7 +146,7 @@ pub(crate) fn decode_bc1_dds(bytes: &[u8]) -> Option<image::RgbImage> {
     let mut img = image::RgbImage::new(w as u32, h as u32);
     for by in 0..bh {
         for bx in 0..bw {
-            let off = 128 + (by * bw + bx) * 8;
+            let off = data + (by * bw + bx) * block + color;
             let c0 = u16::from_le_bytes([bytes[off], bytes[off + 1]]);
             let c1 = u16::from_le_bytes([bytes[off + 2], bytes[off + 3]]);
             let bits = u32::from_le_bytes([bytes[off + 4], bytes[off + 5], bytes[off + 6], bytes[off + 7]]);

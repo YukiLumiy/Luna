@@ -33,11 +33,25 @@ pub struct CacheClearResult {
     pub bytes_freed: u64,
 }
 
-pub(crate) fn is_roblox_running(sys: &mut System) -> bool {
+/// The Roblox player process that is running, if any: (process id, where it runs from).
+pub(crate) fn running_roblox(sys: &mut System) -> Option<(u32, String)> {
     sys.refresh_all();
-    sys.processes_by_name(std::ffi::OsStr::new(PLAYER_EXE))
-        .next()
-        .is_some()
+    sys.processes_by_exact_name(std::ffi::OsStr::new(PLAYER_EXE)).next().map(|p| {
+        let path = p.exe().map(|e| e.display().to_string()).unwrap_or_default();
+        (p.pid().as_u32(), path)
+    })
+}
+
+pub(crate) fn is_roblox_running(sys: &mut System) -> bool {
+    running_roblox(sys).is_some()
+}
+
+/// "Roblox is running (…)" with enough detail to find a process that is stuck in the
+/// background: its id, so it can be ended in Task Manager.
+pub(crate) fn running_message(action: &str) -> Option<String> {
+    running_roblox(&mut System::new()).map(|(pid, _)| {
+        format!("Roblox is running (RobloxPlayerBeta.exe, PID {pid}) — close it first, then {action}. If you can't see Roblox, end that process in Task Manager.")
+    })
 }
 
 fn dir_size(dir: &Path) -> u64 {
@@ -95,9 +109,8 @@ pub(crate) fn clear_cache_files() -> Result<CacheClearResult, String> {
 /// Clears the cache unless Roblox is currently running (deleting under a
 /// live client would just fail on locked files, or corrupt its cache).
 pub(crate) fn clear_if_idle() -> Result<CacheClearResult, String> {
-    let mut sys = System::new();
-    if is_roblox_running(&mut sys) {
-        return Err("Roblox is running — close it first, then clear the cache.".to_string());
+    if let Some(message) = running_message("clear the cache") {
+        return Err(message);
     }
     clear_cache_files()
 }
