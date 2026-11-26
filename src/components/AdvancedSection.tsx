@@ -17,6 +17,8 @@ interface LunaSettings {
   theme: string;
   clear_cache_on_launch: boolean;
   clear_cache_on_exit: boolean;
+  hide_window_on_launch: boolean;
+  game_popup: boolean;
 }
 
 interface CacheClearResult {
@@ -45,6 +47,8 @@ const DEFAULTS: LunaSettings = {
   theme: document.documentElement.getAttribute("data-theme") ?? "dark",
   clear_cache_on_launch: false,
   clear_cache_on_exit: false,
+  hide_window_on_launch: true,
+  game_popup: true,
 };
 
 export function AdvancedSection() {
@@ -198,6 +202,32 @@ export function AdvancedSection() {
           disabled={!loaded}
           label={t("adv.discordToggle")}
           onChange={(enabled) => persist({ discord_rpc_enabled: enabled })}
+        />
+      </div>
+
+      <div className="field-row">
+        <div className="field-text">
+          <span className="field-label">{t("adv.hideOnLaunch")}</span>
+          <p className="appearance-hint">{t("adv.hideOnLaunchHint")}</p>
+        </div>
+        <ToggleSwitch
+          checked={settings.hide_window_on_launch}
+          disabled={!loaded}
+          label={t("adv.hideOnLaunchToggle")}
+          onChange={(enabled) => persist({ hide_window_on_launch: enabled })}
+        />
+      </div>
+
+      <div className="field-row">
+        <div className="field-text">
+          <span className="field-label">{t("adv.gamePopup")}</span>
+          <p className="appearance-hint">{t("adv.gamePopupHint")}</p>
+        </div>
+        <ToggleSwitch
+          checked={settings.game_popup}
+          disabled={!loaded}
+          label={t("adv.gamePopupToggle")}
+          onChange={(enabled) => persist({ game_popup: enabled })}
         />
       </div>
 

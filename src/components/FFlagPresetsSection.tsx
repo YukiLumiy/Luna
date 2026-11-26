@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ToggleSwitch } from "./ToggleSwitch";
+import { Segmented } from "./Segmented";
 import { tx, useT } from "../i18n";
 import { PRESETS, type Flags, type Preset } from "../fflagPresets";
 import { notifyFlagsChanged, onFlagsChanged } from "../flagEvents";
@@ -47,17 +48,14 @@ export function FFlagPresetsSection() {
       p.options.find((o) => Object.keys(o.flags).length > 0 && matches(flags, o.flags)) ??
       (group.every((k) => !(k in flags)) ? p.options[0] : undefined);
     return (
-      <div className="preset-chips">
-        {p.options.map((o) => (
-          <button
-            key={o.label}
-            className={`preset-chip ${active === o ? "preset-chip--on" : ""}`}
-            onClick={() => change(o.flags, group.filter((k) => !(k in o.flags)))}
-          >
-            {tx(o.label)}
-          </button>
-        ))}
-      </div>
+      <Segmented
+        options={p.options.map((o) => ({ key: o.label, label: tx(o.label) }))}
+        active={active ? p.options.indexOf(active) : -1}
+        onSelect={(i) => {
+          const o = p.options[i];
+          void change(o.flags, group.filter((k) => !(k in o.flags)));
+        }}
+      />
     );
   }
 

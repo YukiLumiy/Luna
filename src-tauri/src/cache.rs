@@ -19,6 +19,10 @@ use crate::settings::get_settings;
 
 const PLAYER_EXE: &str = "RobloxPlayerBeta.exe";
 
+/// True while the exit watcher is saving / clearing the cache after Roblox closed, so Luna does
+/// not quit in the middle of it.
+pub(crate) static EXIT_WORK_BUSY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 /// Only entries whose name starts with this are ever touched, so nothing
 /// else under %LOCALAPPDATA%\Roblox (Versions, logs, ...) can be deleted.
 const CACHE_PREFIX: &str = "rbx-storage";
@@ -142,6 +146,7 @@ pub(crate) fn run_exit_watcher() {
         }
 
         if was_running && !running {
+            EXIT_WORK_BUSY.store(true, std::sync::atomic::Ordering::Relaxed);
             // ReCache: keep a copy of the cache before it can be cleared below.
             if get_settings().map(|s| s.recache_auto).unwrap_or(false) {
                 for attempt in 1..=5 {
@@ -174,6 +179,7 @@ pub(crate) fn run_exit_watcher() {
                     }
                 }
             }
+            EXIT_WORK_BUSY.store(false, std::sync::atomic::Ordering::Relaxed);
         }
 
         was_running = running;

@@ -46,6 +46,16 @@ pub struct LunaSettings {
     /// before a launch if the live cache was cleared.
     #[serde(default)]
     pub recache_auto: bool,
+    /// Hide Luna's window while Roblox runs (it comes back when Roblox closes).
+    #[serde(default = "default_true")]
+    pub hide_window_on_launch: bool,
+    /// Show a card at the bottom right (game name and server location) when a game is joined.
+    #[serde(default = "default_true")]
+    pub game_popup: bool,
+}
+
+pub(crate) fn default_true() -> bool {
+    true
 }
 
 pub(crate) fn default_theme() -> String {
@@ -64,6 +74,8 @@ impl Default for LunaSettings {
             clear_cache_on_exit: false,
             skybox_fix_on_launch: false,
             recache_auto: false,
+            hide_window_on_launch: true,
+            game_popup: true,
         }
     }
 }

@@ -59,13 +59,54 @@ pub(crate) fn find_server_ip(log_contents: &str) -> Option<String> {
         .map(|m| m.as_str().to_string())
 }
 
-#[tauri::command]
-pub async fn get_server_location() -> Result<ServerLocation, String> {
-    let log_path = newest_log_file()?;
-    let contents = fs::read_to_string(&log_path).map_err(|e| e.to_string())?;
-    let ip = find_server_ip(&contents)
-        .ok_or("Couldn't find a server address in the latest Roblox log — are you in a game?")?;
+/// Looks up where an IP address is hosted: ip-api.com first, ipwho.is if that one fails
+/// (rate limit, outage). Neither needs a key.
+pub(crate) async fn geolocate(ip: &str) -> Result<ServerLocation, String> {
+    match geolocate_ip_api(ip).await {
+        Ok(found) => Ok(found),
+        Err(first) => geolocate_ipwho(ip).await.map_err(|second| format!("{first}; {second}")),
+    }
+}
 
+async fn geolocate_ipwho(ip: &str) -> Result<ServerLocation, String> {
+    #[derive(Deserialize)]
+    struct Connection {
+        isp: Option<String>,
+    }
+    #[derive(Deserialize)]
+    struct IpWho {
+        success: bool,
+        city: Option<String>,
+        region: Option<String>,
+        country: Option<String>,
+        connection: Option<Connection>,
+    }
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(8))
+        .build()
+        .map_err(|e| e.to_string())?;
+    let response: IpWho = client
+        .get(format!("https://ipwho.is/{ip}"))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?
+        .json()
+        .await
+        .map_err(|e| e.to_string())?;
+    if !response.success {
+        return Err("ipwho.is couldn't place that IP".to_string());
+    }
+    Ok(ServerLocation {
+        ip: ip.to_string(),
+        city: response.city,
+        region: response.region,
+        country: response.country,
+        isp: response.connection.and_then(|c| c.isp),
+    })
+}
+
+async fn geolocate_ip_api(ip: &str) -> Result<ServerLocation, String> {
     #[derive(Deserialize)]
     struct IpApiResponse {
         status: String,
@@ -76,8 +117,14 @@ pub async fn get_server_location() -> Result<ServerLocation, String> {
         isp: Option<String>,
     }
 
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(8))
+        .build()
+        .map_err(|e| e.to_string())?;
     let url = format!("http://ip-api.com/json/{ip}");
-    let response: IpApiResponse = reqwest::get(&url)
+    let response: IpApiResponse = client
+        .get(&url)
+        .send()
         .await
         .map_err(|e| e.to_string())?
         .json()
@@ -89,10 +136,37 @@ pub async fn get_server_location() -> Result<ServerLocation, String> {
     }
 
     Ok(ServerLocation {
-        ip,
+        ip: ip.to_string(),
         city: response.city,
         region: response.region_name,
         country: response.country,
         isp: response.isp,
     })
+}
+
+impl ServerLocation {
+    /// "Tokyo, Japan" / "Ashburn, Virginia, United States" for the popup.
+    pub(crate) fn place(&self) -> Option<String> {
+        let mut parts: Vec<&str> = Vec::new();
+        for part in [self.city.as_deref(), self.region.as_deref(), self.country.as_deref()].into_iter().flatten() {
+            let part = part.trim();
+            if !part.is_empty() && !parts.contains(&part) {
+                parts.push(part);
+            }
+        }
+        if parts.is_empty() {
+            None
+        } else {
+            Some(parts.join(", "))
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn get_server_location() -> Result<ServerLocation, String> {
+    let log_path = newest_log_file()?;
+    let contents = fs::read_to_string(&log_path).map_err(|e| e.to_string())?;
+    let ip = find_server_ip(&contents)
+        .ok_or("Couldn't find a server address in the latest Roblox log — are you in a game?")?;
+    geolocate(&ip).await
 }

@@ -86,6 +86,17 @@ const POLYS = FACETS.map((tri) => {
   return { points: tri.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(" "), color };
 });
 
+/** The low-poly moon itself (no halos), coloured by the current palette and theme. */
+export function MoonDisc() {
+  return (
+    <svg viewBox="0 0 100 100" aria-hidden>
+      {POLYS.map((p, i) => (
+        <polygon key={i} points={p.points} style={{ fill: p.color, stroke: p.color }} strokeWidth="0.35" strokeLinejoin="round" />
+      ))}
+    </svg>
+  );
+}
+
 export function MoonEmblem({ busy = false }: { busy?: boolean }) {
   return (
     <div className={`moon-emblem ${busy ? "moon-emblem--busy" : ""}`}>
@@ -97,11 +108,7 @@ export function MoonEmblem({ busy = false }: { busy?: boolean }) {
       </svg>
       <div className="disc-pos">
         <div className="disc">
-          <svg viewBox="0 0 100 100" aria-hidden>
-            {POLYS.map((p, i) => (
-              <polygon key={i} points={p.points} style={{ fill: p.color, stroke: p.color }} strokeWidth="0.35" strokeLinejoin="round" />
-            ))}
-          </svg>
+          <MoonDisc />
         </div>
       </div>
       {busy && <span className="moon-pulse" />}

@@ -37,6 +37,18 @@ export const ko: Record<keyof typeof en, string> = {
   "home.settings": "설정",
   "home.linked": "Play 링크를 Luna로 열기",
   "home.notLinked": "Play 링크 미설정",
+  "boot.checking": "Roblox 확인 중…",
+  "boot.downloading": "Roblox 다운로드 중… {p}%",
+  "boot.finalizing": "마무리하는 중…",
+  "boot.cancel": "취소",
+  "adv.hideOnLaunch": "플레이 중 Luna 숨기기",
+  "adv.hideOnLaunchHint": "Roblox가 실행되면 Luna 창이 사라지고, Roblox가 종료되면 다시 나타납니다.",
+  "adv.hideOnLaunchToggle": "플레이 중 Luna 숨기기 켜기/끄기",
+  "adv.gamePopup": "게임 정보 카드",
+  "adv.gamePopupHint": "게임에 참가하면 화면 오른쪽 아래에 게임 이름과 서버 위치를 표시합니다.",
+  "adv.gamePopupToggle": "게임 정보 카드 켜기/끄기",
+  "popup.server": "서버: {place}",
+  "popup.noLocation": "서버 위치를 확인할 수 없음",
 
   // settings screen / mod profiles
   "settings.title": "설정",

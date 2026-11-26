@@ -16,11 +16,26 @@ pub(crate) fn roblox_versions_dir() -> Option<PathBuf> {
     }
 }
 
+/// %LOCALAPPDATA%\Luna\Versions — the Roblox versions Luna's own bootstrapper installed.
+pub(crate) fn luna_versions_dir() -> Result<PathBuf, String> {
+    let local_appdata = env::var_os("LOCALAPPDATA").ok_or("LOCALAPPDATA is not set")?;
+    Ok(PathBuf::from(local_appdata).join("Luna").join("Versions"))
+}
+
+/// The Roblox that Luna launches and modifies: the version its bootstrapper installed, or,
+/// if it has not installed one yet, the one Roblox's own installer put on this PC.
+pub(crate) fn latest_version_folder() -> Result<PathBuf, String> {
+    match crate::bootstrap::installed_version_dir() {
+        Some(dir) => Ok(dir),
+        None => legacy_version_folder(),
+    }
+}
+
 /// Roblox does not expose a single "active version" file we can trust across
 /// installs, so we heuristically pick the version folder that contains
 /// RobloxPlayerBeta.exe and was modified most recently. This matches the
 /// folder Roblox itself launches from immediately after an update.
-pub(crate) fn latest_version_folder() -> Result<PathBuf, String> {
+pub(crate) fn legacy_version_folder() -> Result<PathBuf, String> {
     let versions_dir = roblox_versions_dir().ok_or("Roblox is not installed for this user")?;
 
     let mut candidates: Vec<(PathBuf, std::time::SystemTime)> = fs::read_dir(&versions_dir)

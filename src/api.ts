@@ -15,6 +15,7 @@ export interface LaunchResult {
 
 export const api = {
   launch: () => invoke<LaunchResult>("apply_mods_and_launch"),
+  cancelBootstrap: () => invoke<void>("cancel_bootstrap"),
   protocolStatus: () => invoke<ProtocolStatus>("get_protocol_status"),
 };
 
@@ -24,3 +25,12 @@ export function errText(e: unknown): string {
   if (e instanceof Error) return e.message;
   return JSON.stringify(e);
 }
+
+/** What the backend reports while it installs / updates Roblox (see bootstrap.rs). */
+export interface BootProgress {
+  stage: "checking" | "downloading" | "finalizing";
+  percent: number;
+}
+
+/** The backend's answer when the user pressed Cancel during the download. */
+export const CANCELLED = "Cancelled";

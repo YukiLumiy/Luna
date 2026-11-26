@@ -1,15 +1,24 @@
-//! Launching Roblox (after syncing mods) from the Launch button or from a
-//! roblox-player: link.
+//! Launching Roblox: the Launch button and `roblox-player:` links both end up here. Luna
+//! installs / updates Roblox itself first (bootstrap.rs), applies mods, starts the player, and
+//! then follows the game (activity.rs).
 
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
-
-use tauri::Emitter;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::time::{Duration, SystemTime};
 
 use serde::Serialize;
+use tauri::{AppHandle, Emitter, Manager};
 
+use crate::bootstrap;
 use crate::mods::sync_mods;
-use crate::paths::latest_version_folder;
 use crate::settings::get_settings;
+
+/// A launch is under way (between pressing Launch and Roblox's process starting).
+static STARTING: AtomicBool = AtomicBool::new(false);
+/// This Luna process was itself started by a `roblox-player:` link (set in main).
+pub(crate) static STARTED_BY_LINK: AtomicBool = AtomicBool::new(false);
 
 #[derive(Serialize)]
 pub struct LaunchResult {
@@ -28,28 +37,79 @@ pub(crate) fn roblox_uri(args: &[String]) -> Option<String> {
 
 /// The Launch button: starts Roblox with no game to join.
 #[tauri::command]
-pub async fn apply_mods_and_launch(app_handle: tauri::AppHandle) -> Result<LaunchResult, String> {
-    launch_roblox(&app_handle, Vec::new())
+pub async fn apply_mods_and_launch(app_handle: AppHandle) -> Result<LaunchResult, String> {
+    launch_roblox(&app_handle, Vec::new()).await
+}
+
+/// The Cancel button shown while Roblox is being downloaded.
+#[tauri::command]
+pub fn cancel_bootstrap() {
+    bootstrap::CANCEL.store(true, Ordering::Relaxed);
 }
 
 /// Entry point for launches that arrive from outside the UI — either a
 /// `roblox-player:` link that started this very process, or one handed over
 /// by a second Luna instance. Anything without such a link (for example the
-/// user simply opening Luna twice) is ignored. Runs on its own thread so
-/// callers (a plugin callback, the setup hook) are never blocked by file
-/// copying.
-pub(crate) fn launch_uri_if_present(app_handle: tauri::AppHandle, args: &[String]) {
+/// user simply opening Luna twice) is ignored.
+pub(crate) fn launch_uri_if_present(app_handle: AppHandle, args: &[String]) {
     let Some(uri) = roblox_uri(args) else { return };
-    std::thread::spawn(move || {
-        let _ = launch_roblox(&app_handle, vec![uri]);
+    tauri::async_runtime::spawn(async move {
+        if let Err(e) = launch_roblox(&app_handle, vec![uri]).await {
+            // there is no button to show this on: tell the window
+            let _ = app_handle.emit("launch-failed", e);
+        }
     });
 }
 
-pub(crate) fn launch_roblox(
-    app_handle: &tauri::AppHandle,
+fn set_main_visible(app: &AppHandle, visible: bool) {
+    if let Some(window) = app.get_webview_window("main") {
+        if visible {
+            let _ = window.show();
+            let _ = window.set_focus();
+        } else {
+            let _ = window.hide();
+        }
+    }
+}
+
+/// Installs or updates Roblox and returns its folder. If that fails but a Roblox is already on
+/// this PC, that one is used: an old Roblox that starts beats a new one that doesn't.
+async fn prepare_roblox(app: &AppHandle) -> Result<PathBuf, String> {
+    let channel = get_settings().ok().and_then(|s| s.release_channel);
+    let emitter = app.clone();
+    let emit: Arc<dyn Fn(bootstrap::Progress) + Send + Sync> = Arc::new(move |progress| {
+        let _ = emitter.emit("bootstrap-progress", progress);
+    });
+    match bootstrap::ensure_latest(channel, emit).await {
+        Ok(installed) => Ok(installed.dir),
+        Err(e) if e == bootstrap::CANCELLED => Err(e),
+        Err(e) => match bootstrap::installed_version_dir() {
+            Some(dir) => Ok(dir),
+            None => crate::paths::legacy_version_folder().map_err(|_| e),
+        },
+    }
+}
+
+pub(crate) async fn launch_roblox(
+    app_handle: &AppHandle,
+    passthrough_args: Vec<String>,
+) -> Result<LaunchResult, String> {
+    if STARTING.swap(true, Ordering::SeqCst) {
+        return Err("Roblox is already starting".to_string());
+    }
+    // The window may not have started this launch itself (a link did): it shows progress too.
+    let _ = app_handle.emit("launch-started", ());
+    let result = launch_inner(app_handle, passthrough_args).await;
+    STARTING.store(false, Ordering::SeqCst);
+    result
+}
+
+async fn launch_inner(
+    app_handle: &AppHandle,
     mut passthrough_args: Vec<String>,
 ) -> Result<LaunchResult, String> {
-    let version_folder = latest_version_folder()?;
+    let from_link = !passthrough_args.is_empty();
+    let version_folder = prepare_roblox(app_handle).await?;
     let (files_applied, files_restored) = sync_mods(app_handle, &version_folder)?;
 
     // Optional: wipe Roblox's asset cache so nothing stale is served. A
@@ -84,6 +144,7 @@ pub(crate) fn launch_roblox(
         }
     }
 
+    let started = SystemTime::now();
     let mut command = Command::new(&exe);
     command
         .args(&passthrough_args)
@@ -97,10 +158,32 @@ pub(crate) fn launch_roblox(
     // Tell the UI when this Roblox process starts and when it exits, so the
     // Launch button reflects launches that came from a website link too.
     let _ = app_handle.emit("roblox-started", ());
+    let hide = get_settings().map(|s| s.hide_window_on_launch).unwrap_or(true);
+    if hide {
+        set_main_visible(app_handle, false);
+    }
+    let stop_watching = crate::activity::start(app_handle.clone(), started);
+
     let exit_handle = app_handle.clone();
+    let quit_afterwards = from_link && STARTED_BY_LINK.load(Ordering::Relaxed);
     std::thread::spawn(move || {
         let _ = child.wait();
+        stop_watching.store(true, Ordering::Relaxed);
         let _ = exit_handle.emit("roblox-exited", ());
+        if quit_afterwards {
+            // Luna was only opened to start this game: close it with the game, but give the
+            // exit watcher (ReCache copy, cache clearing) the time it needs first.
+            std::thread::sleep(Duration::from_secs(5));
+            for _ in 0..120 {
+                if !crate::cache::EXIT_WORK_BUSY.load(Ordering::Relaxed) {
+                    break;
+                }
+                std::thread::sleep(Duration::from_secs(1));
+            }
+            exit_handle.exit(0);
+        } else if hide {
+            set_main_visible(&exit_handle, true);
+        }
     });
 
     Ok(LaunchResult {

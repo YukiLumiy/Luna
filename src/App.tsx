@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
-import { api, errText } from "./api";
+import { api, errText, CANCELLED, type BootProgress } from "./api";
 import { useT } from "./i18n";
 import { TitleBar } from "./components/TitleBar";
 import { HeroBackground } from "./components/HeroBackground";
@@ -28,6 +28,8 @@ export default function App() {
   const [state, setState] = useState<LaunchState>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [linked, setLinked] = useState<boolean | null>(null);
+  // Roblox is being installed or updated by Luna: how far it is.
+  const [boot, setBoot] = useState<BootProgress | null>(null);
   const alive = useRef(true);
   // Release notes, shown once on the first start after an update.
   const [notes, setNotes] = useState<PatchEntry | null>(null);
@@ -47,11 +49,28 @@ export default function App() {
     // The backend tells us when Roblox has exited.
     const unExit = listen("roblox-exited", () => setState("idle"));
     // Also covers launches that started from a roblox-player: link, not this button.
-    const unStart = listen("roblox-started", () => setState("running"));
+    const unStart = listen("roblox-started", () => {
+      setState("running");
+      setBoot(null);
+    });
+    // A play link started a launch: this window shows its progress like the button's.
+    const unBegin = listen("launch-started", () => {
+      setState("launching");
+      setErrorMessage(null);
+    });
+    const unFail = listen<string>("launch-failed", (e) => {
+      setBoot(null);
+      if (e.payload === CANCELLED) {
+        setState("idle");
+        return;
+      }
+      setState("error");
+      setErrorMessage(e.payload);
+    });
+    const unBoot = listen<BootProgress>("bootstrap-progress", (e) => setBoot(e.payload));
     return () => {
       alive.current = false;
-      unExit.then((f) => f());
-      unStart.then((f) => f());
+      [unExit, unStart, unBegin, unFail, unBoot].forEach((un) => un.then((f) => f()));
     };
   }, [refreshProtocol]);
 
@@ -84,14 +103,26 @@ export default function App() {
       await api.launch();
       setState("running");
     } catch (err) {
-      setState("error");
-      setErrorMessage(errText(err));
+      const text = errText(err);
+      if (text === CANCELLED) {
+        setState("idle");
+      } else {
+        setState("error");
+        setErrorMessage(text);
+      }
+    } finally {
+      setBoot(null);
     }
   }
 
   const busy = state === "launching";
+  // While Roblox downloads, the status line says how far it is.
+  const booting = busy && boot !== null;
   const statusText =
-    state === "launching" ? t("home.launching")
+    booting && boot.stage === "checking" ? t("boot.checking")
+    : booting && boot.stage === "downloading" ? t("boot.downloading", { p: Math.floor(boot.percent) })
+    : booting && boot.stage === "finalizing" ? t("boot.finalizing")
+    : state === "launching" ? t("home.launching")
     : state === "running" ? t("home.running")
     : state === "error" ? errorMessage ?? t("home.failed")
     : t("home.ready");
@@ -112,14 +143,23 @@ export default function App() {
             <>
               <HeroBackground sky={<MoonEmblem busy={busy} />}>
                 <h1 className="welcome-title">{t("home.title")}</h1>
-                <p key={statusText} className={`welcome-status ${state === "error" ? "welcome-status--error" : ""} ${busy ? "welcome-status--busy" : ""}`}>
+                <p key={booting ? `boot-${boot.stage}` : statusText} className={`welcome-status ${state === "error" ? "welcome-status--error" : ""} ${busy ? "welcome-status--busy" : ""}`}>
                   {statusText}
                 </p>
+                {booting && boot.stage !== "checking" && (
+                  <div className="boot" aria-hidden>
+                    <div className="boot-bar"><i style={{ width: `${boot.percent}%` }} /></div>
+                  </div>
+                )}
                 <div className="actions">
                   <PrimaryButton onClick={handleLaunch} disabled={busy || state === "running"} loading={busy}>
                     {t("home.launch")}
                   </PrimaryButton>
-                  <SecondaryButton onClick={() => go("settings")}>{t("home.settings")}</SecondaryButton>
+                  {booting ? (
+                    <SecondaryButton onClick={() => void api.cancelBootstrap()}>{t("boot.cancel")}</SecondaryButton>
+                  ) : (
+                    <SecondaryButton onClick={() => go("settings")}>{t("home.settings")}</SecondaryButton>
+                  )}
                 </div>
               </HeroBackground>
 

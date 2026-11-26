@@ -15,13 +15,20 @@ import "./styles/motion.css";
 import "./styles/themes.css";
 import "./styles/palettes.css";
 import { initSmoothScroll } from "./smoothScroll";
+import { Popup } from "./components/Popup";
+import { applyTheme } from "./theme";
 
-initSmoothScroll();
+// The game card is a second, tiny window running this same page; Luna hands it its data first.
+const popup = window.__LUNA_POPUP__;
+if (popup) {
+  applyTheme(popup.theme);
+  document.documentElement.classList.add("popup-page");
+} else {
+  initSmoothScroll();
+}
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <ErrorBoundary>
-      <App />
-    </ErrorBoundary>
+    <ErrorBoundary>{popup ? <Popup data={popup} /> : <App />}</ErrorBoundary>
   </React.StrictMode>,
 );

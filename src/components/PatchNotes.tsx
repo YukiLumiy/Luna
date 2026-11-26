@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useT } from "../i18n";
 import type { PatchEntry } from "../patchNotes";
@@ -45,18 +45,28 @@ function Notes({ text }: { text: string }) {
 /** The patch notes window: once after an update, and any time from Settings → Updates. */
 export function PatchNotes({ title, entries, onClose }: PatchNotesProps) {
   const t = useT();
+  const [closing, setClosing] = useState(false);
+  const timer = useRef<number>();
+
+  // Closing plays the window's exit first, then tells the parent to remove it.
+  const close = useCallback(() => {
+    if (timer.current !== undefined) return;
+    setClosing(true);
+    timer.current = window.setTimeout(onClose, 220);
+  }, [onClose]);
+  useEffect(() => () => window.clearTimeout(timer.current), []);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && close();
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [close]);
 
   // Rendered into <body>: it is opened from inside scrolling, animated panels, which would
   // otherwise trap a `position: fixed` window inside themselves.
   return createPortal(
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-card" role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
+    <div className={`modal-backdrop ${closing ? "modal-backdrop--out" : ""}`} onClick={close}>
+      <div className={`modal-card ${closing ? "modal-card--out" : ""}`} role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
         <h3 className="modal-title">{title}</h3>
         <div className="modal-body">
           {entries.map((e) => (
@@ -66,7 +76,7 @@ export function PatchNotes({ title, entries, onClose }: PatchNotesProps) {
             </section>
           ))}
         </div>
-        <button className="apply-btn apply-btn--full" onClick={onClose} autoFocus>
+        <button className="apply-btn apply-btn--full" onClick={close} autoFocus>
           {t("update.gotIt")}
         </button>
       </div>

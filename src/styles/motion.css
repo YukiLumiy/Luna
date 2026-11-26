@@ -65,3 +65,69 @@ button:focus-visible, [role="radio"]:focus-visible, [role="switch"]:focus-visibl
   outline: 2px solid color-mix(in srgb, var(--moon) 78%, transparent);
   outline-offset: 2px;
 }
+
+/* =====================================================================
+   Entrance and state motion (v0.2.0)
+   Everything here uses the individual `translate` / `scale` / `rotate` properties, so it
+   never fights the transforms and swells defined elsewhere, and each effect plays only
+   when an element appears or changes state (nothing replays on a re-render).
+   ===================================================================== */
+@keyframes row-in { from { opacity: 0; translate: 0 8px; } }
+@keyframes drop-in { from { opacity: 0; translate: 0 -6px; } }
+@keyframes slide-from-left { from { opacity: 0; translate: -12px 0; } }
+@keyframes select-ring {
+  from { box-shadow: 0 0 0 0 var(--glow); }
+  to { box-shadow: 0 0 0 11px transparent; }
+}
+
+/* Settings: the header slides in, then every row of a card follows its card, one by one. */
+.settings-header { animation: slide-from-left 460ms cubic-bezier(0.16, 1, 0.3, 1) backwards; }
+.section-label, .profiles-heading-row { animation: row-in 420ms cubic-bezier(0.16, 1, 0.3, 1) 260ms backwards; }
+.appearance-block > * { animation: row-in 440ms cubic-bezier(0.16, 1, 0.3, 1) backwards; animation-delay: 150ms; }
+.appearance-block > :nth-child(2) { animation-delay: 195ms; }
+.appearance-block > :nth-child(3) { animation-delay: 240ms; }
+.appearance-block > :nth-child(4) { animation-delay: 285ms; }
+.appearance-block > :nth-child(5) { animation-delay: 330ms; }
+.appearance-block > :nth-child(n+6) { animation-delay: 375ms; }
+
+/* Rows of lists arrive when they are added (and on first load). */
+.flag-row, .fprofile-row, .sky-mine-item { animation: row-in 340ms cubic-bezier(0.16, 1, 0.3, 1) backwards; }
+
+/* Messages drop in instead of popping in. */
+.status-text, .flag-error, .settings-error, .settings-empty, .server-result, .sky-mine-empty {
+  animation: drop-in 300ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+/* Sky templates: the chevron turns, the grid unfolds and the thumbnails follow one another. */
+.sky-templates-chevron { display: inline-block; transition: rotate 300ms cubic-bezier(0.22, 1.2, 0.36, 1); }
+.sky-templates-chevron.is-open { rotate: 90deg; }
+.sky-templates-grid { animation: drop-in 320ms cubic-bezier(0.16, 1, 0.3, 1) backwards; }
+.sky-template { animation: row-in 380ms cubic-bezier(0.16, 1, 0.3, 1) backwards; }
+.sky-template:nth-child(2) { animation-delay: 25ms; }
+.sky-template:nth-child(3) { animation-delay: 50ms; }
+.sky-template:nth-child(4) { animation-delay: 75ms; }
+.sky-template:nth-child(5) { animation-delay: 100ms; }
+.sky-template:nth-child(6) { animation-delay: 125ms; }
+.sky-template:nth-child(7) { animation-delay: 150ms; }
+.sky-template:nth-child(8) { animation-delay: 175ms; }
+.sky-template:nth-child(n+9) { animation-delay: 200ms; }
+
+/* Choosing something sends out a soft ring from it (runs once, when it becomes selected). */
+.theme-tile--active, .palette-tile--active, .sky-mine-item--on { animation: select-ring 520ms ease-out; }
+.sky-template--on img { animation: select-ring 520ms ease-out; }
+
+/* Rows react to the pointer a little. */
+.flag-row, .fprofile-row, .profile-row, .sky-mine-item {
+  transition: background-color 180ms ease, border-color 180ms ease;
+}
+.flag-row:hover, .fprofile-row:hover, .profile-row:hover { background-color: var(--bg-surface-hover); }
+.sky-mine-item:not(.sky-mine-item--on):hover { border-color: var(--ember-dark); }
+
+/* The footer (link status + version) fades up last on the home screen. */
+.footer { animation: row-in 600ms cubic-bezier(0.16, 1, 0.3, 1) 320ms backwards; }
+
+/* Pressing a button squeezes it. (Options of a segmented control and thumbnails are left out.) */
+button:not(:disabled):not(.preset-chip):not(.sky-template):active { scale: calc(var(--swell, 1) * 0.94); transition-duration: 90ms; }
+
+/* Release notes: the entries come one after another. */
+.modal-entry { animation: row-in 400ms cubic-bezier(0.16, 1, 0.3, 1) 140ms backwards; }

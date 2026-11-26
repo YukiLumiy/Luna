@@ -415,7 +415,7 @@ export function AppearanceSection({ onApplied, syncKey = 0 }: AppearanceSectionP
             >
               <span>{t("sky.templates")}</span>
               <span className="sky-templates-count">{presets.length}</span>
-              <span className="sky-templates-chevron">{showTemplates ? "▾" : "▸"}</span>
+              <span className={`sky-templates-chevron ${showTemplates ? "is-open" : ""}`}>▸</span>
             </button>
             {showTemplates && (
               <div

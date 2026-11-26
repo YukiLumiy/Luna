@@ -1,11 +1,14 @@
 // Prevents an additional console window on Windows in release builds.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod activity;
 mod appearance;
+mod bootstrap;
 mod cache;
 mod fflag_presets;
 mod fflags;
 mod launch;
+mod logparse;
 mod mods;
 mod paths;
 mod protocol;
@@ -32,6 +35,9 @@ fn main() {
         // If *this* process was started by a roblox-player: link, launch it.
         .setup(|app| {
             let args: Vec<String> = std::env::args().collect();
+            if launch::roblox_uri(&args).is_some() {
+                launch::STARTED_BY_LINK.store(true, std::sync::atomic::Ordering::Relaxed);
+            }
             launch::launch_uri_if_present(app.handle().clone(), &args);
             Ok(())
         })
@@ -39,6 +45,7 @@ fn main() {
         .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
             launch::apply_mods_and_launch,
+            launch::cancel_bootstrap,
             protocol::get_protocol_status,
             protocol::register_protocol_handler,
             protocol::restore_protocol_handler,

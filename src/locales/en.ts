@@ -35,6 +35,18 @@ export const en = {
   "home.settings": "Settings",
   "home.linked": "Play links via Luna",
   "home.notLinked": "Play links not set up",
+  "boot.checking": "Checking Roblox…",
+  "boot.downloading": "Downloading Roblox… {p}%",
+  "boot.finalizing": "Finishing up…",
+  "boot.cancel": "Cancel",
+  "adv.hideOnLaunch": "Hide Luna while playing",
+  "adv.hideOnLaunchHint": "Luna's window disappears once Roblox is running and comes back when it closes.",
+  "adv.hideOnLaunchToggle": "Toggle hiding Luna while playing",
+  "adv.gamePopup": "Game card",
+  "adv.gamePopupHint": "When you join a game, shows its name and where its server is at the bottom right of the screen.",
+  "adv.gamePopupToggle": "Toggle the game card",
+  "popup.server": "Server: {place}",
+  "popup.noLocation": "Server location unavailable",
 
   // settings screen / mod profiles
   "settings.title": "Settings",
