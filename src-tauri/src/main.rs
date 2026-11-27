@@ -48,6 +48,7 @@ fn main() {
             launch::cancel_bootstrap,
             activity::get_server_status,
             activity::refresh_server_status,
+            activity::clear_server_history,
             bootstrap::get_roblox_install,
             bootstrap::reinstall_roblox,
             protocol::get_protocol_status,

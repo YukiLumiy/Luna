@@ -34,13 +34,16 @@ git push origin HEAD --tags   # Actions がビルド・署名・公開
 ```
 tauri.conf.json の updater の endpoints は YukiLumiy/Luna を仮置きしています。
 
-## v0.2.0 で入ったもの
+## v0.2.0 / v0.2.1 / v0.2.2 で入ったもの
 - ブートストラッパー（src-tauri/src/bootstrap.rs）: 起動のたびに最新版を確認し、足りなければ Roblox の CDN からダウンロード（4並列・MD5検証・3回まで再試行）して `%LOCALAPPDATA%\\Luna\\Versions\\<version>` に展開。`<version>.partial` で作って完成後にリネームするので、`RobloxPlayerBeta.exe` がある版は必ず完全。古い版は Roblox 実行中でなければ削除。オフライン / 取得失敗時はインストール済みの版（なければ従来の `%LOCALAPPDATA%\\Roblox\\Versions`）で起動。Roblox 公式インストーラは使わない
 - 進捗はホーム画面（状態文 + 細いバー、Settings ボタンが Cancel に変わる）。`roblox-player:` リンクで起動した場合もこの窓が出る。`bootstrap-progress` / `launch-started` / `launch-failed` イベントで通知
 - プレイ中はウィンドウを隠す（Settings → Advanced → Hide Luna while playing）。リンクから起動された Luna は Roblox の終了時（キャッシュ処理の完了後）に自動で終了
 - ゲーム参加時、画面右下にゲーム名とサーバー位置のカード（activity.rs + logparse.rs。Roblox のログの `Joining game` / `UDMUX Address` / `serverId:` 行を読む。形式が変わったら logparse.rs の正規表現を直す）。クリックを通さない透明ウィンドウで、データは `window.__LUNA_POPUP__` で渡す（main.tsx が Popup を表示）。Settings → Advanced → Game card で ON/OFF
 - 選択肢の区切り線を短く薄くし、選択中の塗りがスライドして移る（Segmented.tsx）
 - 出現・切替のアニメーションを追加（motion.css 末尾。`translate` / `scale` プロパティだけを使うので既存の transform と衝突しない）
+
+- v0.2.1: Settings → Server（現在/直近のサーバー、ping、人数、最近のゲーム、参加リンクのコピー。activity.rs の `ServerInfo`）、ゲームカードに ping と人数、カードは自分のフェードアウト終了後にウィンドウを閉じる（capabilities/popup.json）、登録スカイボックスのサムネイルは ft（なければ手元の1枚）、編集モードは外側クリックで終了（useOutsideDismiss.ts）、Roblox のバージョン表示と再インストール
+- v0.2.2: サーバー位置の取得を ipinfo.io 優先に変更（Roblox のアドレスは登録上すべて米国なので、登録地で答える ip-api だと日本のサーバーも United States になる）。二重起動エラーの抑止、再インストールの起動中ガード、未使用ファイルの削除（liquidGlass / sound / Glass* / SkyboxFixSection / windowEffects / Toggle / LaunchScreen / MoonIcon / glass.css / sfx）
 
 ## 次のステップ
 - Windows 実機での動作確認（ブートストラッパーの実ダウンロード、右下カード、ウィンドウの隠れ方）

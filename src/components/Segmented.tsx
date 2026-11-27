@@ -26,7 +26,10 @@ export function Segmented({ options, active, onSelect }: SegmentedProps) {
     const chips = Array.from(el.querySelectorAll<HTMLElement>(".preset-chip"));
     const measure = () => {
       const chip = chips[active];
-      setBox(chip ? { x: chip.offsetLeft, y: chip.offsetTop, w: chip.offsetWidth, h: chip.offsetHeight } : null);
+      const next = chip ? { x: chip.offsetLeft, y: chip.offsetTop, w: chip.offsetWidth, h: chip.offsetHeight } : null;
+      setBox((prev) =>
+        prev && next && prev.x === next.x && prev.y === next.y && prev.w === next.w && prev.h === next.h ? prev : next,
+      );
     };
     measure();
     // widths change when a font finishes loading or the language changes

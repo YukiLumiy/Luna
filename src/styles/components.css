@@ -1116,3 +1116,15 @@
 .server-recent-game { font-size: 12.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .server-recent-meta { font-size: 10.5px; color: var(--ink-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @keyframes server-pulse { to { box-shadow: 0 0 0 7px rgba(74, 222, 128, 0); } }
+
+/* The recent games scroll instead of making the page longer and longer. */
+.server-recent-list { max-height: 228px; overflow-y: auto; margin: 0 -6px 0 0; padding-right: 6px; overscroll-behavior: contain; }
+.server-clear-label { margin: 12px 0 6px; }
+.server-clear { display: flex; gap: 6px; }
+.server-clear-btn {
+  flex: 1 1 0; min-width: 0; height: 28px; padding: 0 6px; font-size: 11.5px; font-weight: 700;
+  color: var(--ink-muted); background: var(--bg-surface-hover); border: 1px solid var(--line); border-radius: 10px;
+  white-space: nowrap; transition: color 180ms ease, background-color 180ms ease, border-color 180ms ease;
+}
+.server-clear-btn:hover { color: var(--ink); border-color: var(--line-strong); }
+.server-clear-btn--armed, .server-clear-btn--armed:hover { color: var(--danger); border-color: var(--danger); }

@@ -554,6 +554,9 @@ pub fn get_roblox_install() -> RobloxInstall {
 /// downloads a fresh, complete copy (the fix for a Roblox that no longer starts).
 #[tauri::command]
 pub fn reinstall_roblox() -> Result<(), String> {
+    if crate::launch::is_starting() {
+        return Err("Roblox is being started right now — wait until it is running, close it, then reinstall.".to_string());
+    }
     if let Some(message) = crate::cache::running_message("reinstall it") {
         return Err(message);
     }

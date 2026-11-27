@@ -59,13 +59,116 @@ pub(crate) fn find_server_ip(log_contents: &str) -> Option<String> {
         .map(|m| m.as_str().to_string())
 }
 
-/// Looks up where an IP address is hosted: ip-api.com first, ipwho.is if that one fails
-/// (rate limit, outage). Neither needs a key.
+/// Looks up where an IP address is. Roblox's servers sit in address blocks registered to
+/// Roblox in the United States, and a lookup that goes by the registration (ip-api.com does)
+/// answers "United States" for a server in Tokyo. ipinfo.io places addresses by where they
+/// really answer from, so it goes first; ipwho.is and ip-api.com are the fallbacks for when it
+/// is unreachable or over its free limit.
 pub(crate) async fn geolocate(ip: &str) -> Result<ServerLocation, String> {
+    let mut failures: Vec<String> = Vec::new();
+    match geolocate_ipinfo(ip).await {
+        Ok(found) => return Ok(found),
+        Err(e) => failures.push(e),
+    }
+    match geolocate_ipwho(ip).await {
+        Ok(found) => return Ok(found),
+        Err(e) => failures.push(e),
+    }
     match geolocate_ip_api(ip).await {
         Ok(found) => Ok(found),
-        Err(first) => geolocate_ipwho(ip).await.map_err(|second| format!("{first}; {second}")),
+        Err(e) => {
+            failures.push(e);
+            Err(failures.join("; "))
+        }
     }
+}
+
+async fn geolocate_ipinfo(ip: &str) -> Result<ServerLocation, String> {
+    #[derive(Deserialize)]
+    struct IpInfo {
+        city: Option<String>,
+        region: Option<String>,
+        country: Option<String>,
+        org: Option<String>,
+        #[serde(default)]
+        bogon: bool,
+    }
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(8))
+        .build()
+        .map_err(|e| e.to_string())?;
+    let response: IpInfo = client
+        .get(format!("https://ipinfo.io/{ip}/json"))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?
+        .error_for_status()
+        .map_err(|e| e.to_string())?
+        .json()
+        .await
+        .map_err(|e| e.to_string())?;
+    if response.bogon || (response.city.is_none() && response.country.is_none()) {
+        return Err("ipinfo.io couldn't place that IP".to_string());
+    }
+    Ok(ServerLocation {
+        ip: ip.to_string(),
+        city: response.city,
+        region: response.region,
+        country: response.country.map(|code| country_name(&code)),
+        isp: response.org,
+    })
+}
+
+/// ipinfo.io gives the country as a two-letter code. These are the countries Roblox has
+/// servers in (and a few more); anything else keeps its code.
+fn country_name(code: &str) -> String {
+    let name = match code.to_ascii_uppercase().as_str() {
+        "US" => "United States",
+        "JP" => "Japan",
+        "KR" => "South Korea",
+        "SG" => "Singapore",
+        "HK" => "Hong Kong",
+        "TW" => "Taiwan",
+        "IN" => "India",
+        "AU" => "Australia",
+        "NZ" => "New Zealand",
+        "CA" => "Canada",
+        "MX" => "Mexico",
+        "BR" => "Brazil",
+        "AR" => "Argentina",
+        "CL" => "Chile",
+        "GB" => "United Kingdom",
+        "IE" => "Ireland",
+        "FR" => "France",
+        "DE" => "Germany",
+        "NL" => "Netherlands",
+        "BE" => "Belgium",
+        "ES" => "Spain",
+        "PT" => "Portugal",
+        "IT" => "Italy",
+        "CH" => "Switzerland",
+        "AT" => "Austria",
+        "PL" => "Poland",
+        "CZ" => "Czechia",
+        "SE" => "Sweden",
+        "NO" => "Norway",
+        "FI" => "Finland",
+        "DK" => "Denmark",
+        "RU" => "Russia",
+        "TR" => "Türkiye",
+        "AE" => "United Arab Emirates",
+        "IL" => "Israel",
+        "ZA" => "South Africa",
+        "ID" => "Indonesia",
+        "TH" => "Thailand",
+        "VN" => "Vietnam",
+        "PH" => "Philippines",
+        "MY" => "Malaysia",
+        "CN" => "China",
+        _ => return code.to_ascii_uppercase(),
+    };
+    name.to_string()
 }
 
 async fn geolocate_ipwho(ip: &str) -> Result<ServerLocation, String> {
@@ -169,4 +272,28 @@ pub async fn get_server_location() -> Result<ServerLocation, String> {
     let ip = find_server_ip(&contents)
         .ok_or("Couldn't find a server address in the latest Roblox log — are you in a game?")?;
     geolocate(&ip).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn country_codes_become_names() {
+        assert_eq!(country_name("jp"), "Japan");
+        assert_eq!(country_name("US"), "United States");
+        assert_eq!(country_name("ZZ"), "ZZ");
+    }
+
+    #[test]
+    fn the_place_leaves_out_repeats() {
+        let loc = ServerLocation {
+            ip: "1.2.3.4".into(),
+            city: Some("Tokyo".into()),
+            region: Some("Tokyo".into()),
+            country: Some("Japan".into()),
+            isp: None,
+        };
+        assert_eq!(loc.place().as_deref(), Some("Tokyo, Japan"));
+    }
 }

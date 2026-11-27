@@ -20,6 +20,14 @@ static STARTING: AtomicBool = AtomicBool::new(false);
 /// This Luna process was itself started by a `roblox-player:` link (set in main).
 pub(crate) static STARTED_BY_LINK: AtomicBool = AtomicBool::new(false);
 
+/// What a launch answers when another one is still starting.
+const ALREADY_STARTING: &str = "Roblox is already starting";
+
+/// True between pressing Launch and Roblox's process starting.
+pub(crate) fn is_starting() -> bool {
+    STARTING.load(Ordering::SeqCst)
+}
+
 #[derive(Serialize)]
 pub struct LaunchResult {
     version_folder: String,
@@ -54,9 +62,14 @@ pub fn cancel_bootstrap() {
 pub(crate) fn launch_uri_if_present(app_handle: AppHandle, args: &[String]) {
     let Some(uri) = roblox_uri(args) else { return };
     tauri::async_runtime::spawn(async move {
-        if let Err(e) = launch_roblox(&app_handle, vec![uri]).await {
+        match launch_roblox(&app_handle, vec![uri]).await {
+            // a second click on the same link while the first is under way: nothing to report
+            Err(e) if e == ALREADY_STARTING => {}
             // there is no button to show this on: tell the window
-            let _ = app_handle.emit("launch-failed", e);
+            Err(e) => {
+                let _ = app_handle.emit("launch-failed", e);
+            }
+            Ok(_) => {}
         }
     });
 }
@@ -95,7 +108,7 @@ pub(crate) async fn launch_roblox(
     passthrough_args: Vec<String>,
 ) -> Result<LaunchResult, String> {
     if STARTING.swap(true, Ordering::SeqCst) {
-        return Err("Roblox is already starting".to_string());
+        return Err(ALREADY_STARTING.to_string());
     }
     // The window may not have started this launch itself (a link did): it shows progress too.
     let _ = app_handle.emit("launch-started", ());

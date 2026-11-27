@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useT } from "../i18n";
+import { useArmed } from "../useArmed";
 import { StatusLine } from "./StatusLine";
 
 interface ServerInfo {
@@ -53,6 +54,7 @@ export function ServerSection() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { armed, arm, disarm } = useArmed();
 
   const load = useCallback(() => {
     invoke<ServerStatus>("get_server_status").then(setStatus).catch((e) => setError(String(e)));
@@ -80,6 +82,22 @@ export function ServerSection() {
     }
   }
 
+  /** Deletes history older than `secs` seconds (everything for null); asks once more first. */
+  async function clearHistory(id: string, secs: number | null) {
+    if (armed !== id) return arm(id);
+    disarm();
+    setError(null);
+    try {
+      const before = status?.history.length ?? 0;
+      const next = await invoke<ServerStatus>("clear_server_history", { olderThanSecs: secs });
+      setStatus(next);
+      const removed = before - next.history.length;
+      setMessage(removed > 0 ? t("server.cleared", { n: removed }) : t("server.clearedNone"));
+    } catch (e) {
+      setError(String(e));
+    }
+  }
+
   async function copy(s: ServerInfo) {
     setError(null);
     try {
@@ -89,6 +107,14 @@ export function ServerSection() {
       setError(t("server.copyFailed"));
     }
   }
+
+  const clearOptions: { id: string; secs: number | null; label: string }[] = [
+    { id: "1h", secs: 3600, label: t("server.clear1h") },
+    { id: "1d", secs: 86400, label: t("server.clear1d") },
+    { id: "1w", secs: 604800, label: t("server.clear1w") },
+    { id: "1m", secs: 2592000, label: t("server.clear1m") },
+    { id: "all", secs: null, label: t("server.clearAll") },
+  ];
 
   const cur = status?.current ?? null;
   // everything except the one shown in the big card
@@ -129,31 +155,48 @@ export function ServerSection() {
         </div>
       )}
 
-      {others.length > 0 && (
+      {(status?.history.length ?? 0) > 0 && (
         <div className="server-recent">
-          <h4 className="sky-mine-title">{t("server.recent")}</h4>
-          {others.map((s) => (
-            <div className="server-recent-row" key={`${s.job_id ?? s.game}-${s.joined_at}`}>
-              <div className="server-recent-text">
-                <span className="server-recent-game">{s.game}</span>
-                <span className="server-recent-meta">
-                  {[s.place, ago(s.joined_at)].filter(Boolean).join(" · ")}
-                </span>
-              </div>
-              <button
-                className="icon-btn"
-                disabled={s.place_id === null}
-                title={t("server.copyLink")}
-                aria-label={t("server.copyLinkFor", { name: s.game })}
-                onClick={() => copy(s)}
-              >
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                  <rect x="5.5" y="5.5" width="8" height="8" rx="1.8" stroke="currentColor" strokeWidth="1.4" />
-                  <path d="M10.5 3.8V3.5A1.5 1.5 0 0 0 9 2H3.5A1.5 1.5 0 0 0 2 3.5V9a1.5 1.5 0 0 0 1.5 1.5h.3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                </svg>
-              </button>
+          <h4 className="sky-mine-title">{t("server.recent", { n: status?.history.length ?? 0 })}</h4>
+          {others.length > 0 && (
+            <div className="server-recent-list">
+              {others.map((s) => (
+                <div className="server-recent-row" key={`${s.job_id ?? s.game}-${s.joined_at}`}>
+                  <div className="server-recent-text">
+                    <span className="server-recent-game">{s.game}</span>
+                    <span className="server-recent-meta">{[s.place, ago(s.joined_at)].filter(Boolean).join(" · ")}</span>
+                  </div>
+                  <button
+                    className="icon-btn"
+                    disabled={s.place_id === null}
+                    title={t("server.copyLink")}
+                    aria-label={t("server.copyLinkFor", { name: s.game })}
+                    onClick={() => copy(s)}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                      <rect x="5.5" y="5.5" width="8" height="8" rx="1.8" stroke="currentColor" strokeWidth="1.4" />
+                      <path d="M10.5 3.8V3.5A1.5 1.5 0 0 0 9 2H3.5A1.5 1.5 0 0 0 2 3.5V9a1.5 1.5 0 0 0 1.5 1.5h.3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
+          <p className="appearance-hint server-clear-label">{t("server.clear")}</p>
+          <div className="server-clear">
+            {clearOptions.map((o) => (
+              <button
+                key={o.id}
+                className={`server-clear-btn ${armed === o.id ? "server-clear-btn--armed" : ""}`}
+                data-armed={armed === o.id}
+                onClick={() => clearHistory(o.id, o.secs)}
+              >
+                <span key={armed === o.id ? "c" : "n"} className="swap-label">
+                  {armed === o.id ? t("server.clearConfirm") : o.label}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
       )}
       <StatusLine text={error ?? message} error={Boolean(error)} />

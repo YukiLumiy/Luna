@@ -19,7 +19,8 @@ use crate::settings::get_settings;
 const POPUP_LIMIT_SECONDS: u64 = 25;
 const POPUP_WIDTH: f64 = 380.0;
 const POPUP_HEIGHT: f64 = 140.0;
-const HISTORY_LEN: usize = 12;
+/// A ceiling so the file cannot grow for ever (the list scrolls, and Settings can clear it).
+const HISTORY_LEN: usize = 500;
 
 static POPUP_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -68,6 +69,7 @@ fn lock() -> std::sync::MutexGuard<'static, ServerState> {
                 for item in &mut list {
                     item.in_game = false;
                 }
+                state.current = list.first().cloned();
                 state.history = list;
             }
         }
@@ -124,6 +126,36 @@ fn mark_left(app: &AppHandle) {
         save_history(&state.history);
     }
     let _ = app.emit("server-changed", ());
+}
+
+/// Drops the entries older than `older_than` seconds (all of them for `None`), except the game
+/// being played right now. Returns how many went.
+fn prune_history(list: &mut Vec<ServerInfo>, now: u64, older_than: Option<u64>) -> usize {
+    let before = list.len();
+    let cutoff = older_than.map(|secs| now.saturating_sub(secs));
+    list.retain(|h| h.in_game || cutoff.map_or(false, |c| h.joined_at >= c));
+    before - list.len()
+}
+
+/// Settings -> Server -> Delete history: removes games played longer ago than the given
+/// number of seconds, or every game when none is given. The game being played stays.
+#[tauri::command]
+pub fn clear_server_history(app: AppHandle, older_than_secs: Option<u64>) -> ServerStatus {
+    {
+        let mut state = lock();
+        let now = now_secs();
+        prune_history(&mut state.history, now, older_than_secs);
+        // the "last server" card goes with its entry
+        let keep = state.current.as_ref().map_or(true, |c| {
+            c.in_game || state.history.iter().any(|h| h.job_id == c.job_id && h.joined_at == c.joined_at)
+        });
+        if !keep {
+            state.current = state.history.first().cloned();
+        }
+        save_history(&state.history);
+    }
+    let _ = app.emit("server-changed", ());
+    snapshot()
 }
 
 /// Settings -> Server: what is known right now.
@@ -506,6 +538,25 @@ mod tests {
         let ko = "    최소 = 12ms, 최대 = 15ms, 평균 = 14ms";
         assert_eq!(average_ms(ko), Some(14));
         assert_eq!(average_ms("Request timed out.\r\nPackets: Sent = 3, Received = 0, Lost = 3 (100% loss)"), None);
+    }
+
+    #[test]
+    fn history_is_cleared_by_age_and_the_current_game_stays() {
+        let entry = |age: u64, in_game: bool| ServerInfo { joined_at: 1_000_000 - age, in_game, ..Default::default() };
+        let make = || vec![entry(0, true), entry(1_800, false), entry(7_200, false), entry(200_000, false)];
+        let now = 1_000_000;
+
+        let mut list = make();
+        assert_eq!(prune_history(&mut list, now, Some(3_600)), 2); // older than an hour
+        assert_eq!(list.len(), 2);
+
+        let mut list = make();
+        assert_eq!(prune_history(&mut list, now, Some(86_400)), 1); // older than a day
+        assert_eq!(list.len(), 3);
+
+        let mut list = make();
+        assert_eq!(prune_history(&mut list, now, None), 3); // everything but the live game
+        assert!(list.iter().all(|h| h.in_game));
     }
 
     #[test]
