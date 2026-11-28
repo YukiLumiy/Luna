@@ -19,6 +19,7 @@ interface LunaSettings {
   clear_cache_on_exit: boolean;
   hide_window_on_launch: boolean;
   game_popup: boolean;
+  brand_roblox_window: boolean;
 }
 
 interface CacheClearResult {
@@ -41,6 +42,7 @@ const DEFAULTS: LunaSettings = {
   clear_cache_on_exit: false,
   hide_window_on_launch: true,
   game_popup: true,
+  brand_roblox_window: true,
 };
 
 export function AdvancedSection() {
@@ -190,6 +192,19 @@ export function AdvancedSection() {
           disabled={!loaded}
           label={t("adv.hideOnLaunchToggle")}
           onChange={(enabled) => persist({ hide_window_on_launch: enabled })}
+        />
+      </div>
+
+      <div className="field-row">
+        <div className="field-text">
+          <span className="field-label">{t("adv.brandWindow")}</span>
+          <p className="appearance-hint">{t("adv.brandWindowHint")}</p>
+        </div>
+        <ToggleSwitch
+          checked={settings.brand_roblox_window}
+          disabled={!loaded}
+          label={t("adv.brandWindowToggle")}
+          onChange={(enabled) => persist({ brand_roblox_window: enabled })}
         />
       </div>
 

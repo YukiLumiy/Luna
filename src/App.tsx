@@ -93,7 +93,10 @@ export default function App() {
     setDirection(next === "settings" ? "forward" : "backward");
     setView(next);
     // Settings may have changed the roblox-player link handler.
-    if (next === "home") refreshProtocol();
+    if (next === "home") {
+      refreshProtocol();
+      invoke<{ theme: string }>("get_settings").then((st) => applyTheme(st.theme)).catch(() => undefined);
+    }
   }
 
   async function handleLaunch() {

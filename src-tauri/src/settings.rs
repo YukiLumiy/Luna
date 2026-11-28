@@ -58,6 +58,9 @@ pub struct LunaSettings {
     /// Check Roblox's files before every launch and repair what is damaged.
     #[serde(default = "default_true")]
     pub verify_before_launch: bool,
+    /// Give Roblox's window Luna's name and icon ("Luna : Roblox", "Luna : <game>").
+    #[serde(default = "default_true")]
+    pub brand_roblox_window: bool,
 }
 
 pub(crate) fn default_true() -> bool {
@@ -84,6 +87,7 @@ impl Default for LunaSettings {
             game_popup: true,
             pinned_roblox_version: None,
             verify_before_launch: true,
+            brand_roblox_window: true,
         }
     }
 }

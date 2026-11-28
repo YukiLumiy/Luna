@@ -25,6 +25,9 @@ interface RobloxSettings {
   [key: string]: unknown;
 }
 
+/** The last list that was fetched: shown at once when Settings is opened again, then refreshed. */
+let cachedVersions: RobloxVersion[] | null = null;
+
 /** Saves a change to the settings without touching the other fields. */
 async function patchSettings(patch: Partial<RobloxSettings>): Promise<RobloxSettings> {
   const current = await invoke<RobloxSettings>("get_settings");
@@ -37,7 +40,8 @@ async function patchSettings(patch: Partial<RobloxSettings>): Promise<RobloxSett
 export function RobloxSection() {
   const t = useT();
   const [settings, setSettings] = useState<RobloxSettings | null>(null);
-  const [versions, setVersions] = useState<RobloxVersion[] | null>(null);
+  const [versions, setVersions] = useState<RobloxVersion[] | null>(cachedVersions);
+  const [manual, setManual] = useState("");
   const [picked, setPicked] = useState<string | null>(null);
   const [loadingList, setLoadingList] = useState(false);
   const [checking, setChecking] = useState<"quick" | "deep" | null>(null);
@@ -47,6 +51,8 @@ export function RobloxSection() {
 
   useEffect(() => {
     invoke<RobloxSettings>("get_settings").then(setSettings).catch((e) => setError(String(e)));
+    // the list is there without pressing anything, and is fetched again on every visit
+    void showVersions();
     // a repair downloads files: its progress arrives here
     const un = listen<BootProgress>("bootstrap-progress", (e) => setPercent(e.payload.stage === "downloading" ? Math.floor(e.payload.percent) : null));
     return () => {
@@ -60,8 +66,11 @@ export function RobloxSection() {
     setLoadingList(true);
     setError(null);
     try {
-      setVersions(await invoke<RobloxVersion[]>("list_roblox_versions"));
+      const list = await invoke<RobloxVersion[]>("list_roblox_versions");
+      cachedVersions = list;
+      setVersions(list);
     } catch (e) {
+      // an older list that is still on screen stays useful
       setError(String(e));
     } finally {
       setLoadingList(false);
@@ -75,6 +84,7 @@ export function RobloxSection() {
       await invoke("set_roblox_pin", { version });
       setSettings(await invoke<RobloxSettings>("get_settings"));
       setPicked(null);
+      setManual("");
       setMessage(version ? t("roblox.pinned") : t("roblox.unpinned"));
     } catch (e) {
       setError(String(e));
@@ -124,13 +134,14 @@ export function RobloxSection() {
 
       <div className="appearance-row">
         <button className="apply-btn" style={{ flex: 1 }} disabled={loadingList} onClick={showVersions}>
-          {loadingList ? t("common.working") : versions ? t("roblox.reload") : t("roblox.choose")}
+          {loadingList ? t("common.working") : t("roblox.reload")}
         </button>
         <button className="apply-btn" style={{ flex: 1 }} disabled={!pinned} onClick={() => pin(null)}>
           {t("roblox.useNewest")}
         </button>
       </div>
 
+      {!versions && loadingList && <p className="appearance-hint">{t("roblox.loadingList")}</p>}
       {versions && (
         <>
           <div className="version-list">
@@ -163,7 +174,26 @@ export function RobloxSection() {
         </>
       )}
 
-      <div className="field-row">
+      <div className="field-column roblox-gap">
+        <span className="field-label">{t("roblox.manual")}</span>
+        <p className="appearance-hint">{t("roblox.manualHint")}</p>
+        <div className="appearance-row">
+          <input
+            className="flag-input"
+            style={{ flex: 1, minWidth: 0 }}
+            value={manual}
+            placeholder="version-0123456789abcdef"
+            spellCheck={false}
+            onChange={(e) => setManual(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && manual.trim() && void pin(manual)}
+          />
+          <button className="apply-btn" disabled={!manual.trim()} onClick={() => pin(manual)}>
+            {t("roblox.manualUse")}
+          </button>
+        </div>
+      </div>
+
+      <div className="field-row roblox-gap">
         <div className="field-text">
           <span className="field-label">{t("roblox.verify")}</span>
           <p className="appearance-hint">{t("roblox.verifyHint")}</p>

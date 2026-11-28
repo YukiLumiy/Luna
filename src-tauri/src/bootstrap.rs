@@ -769,13 +769,46 @@ pub async fn list_roblox_versions() -> Result<Vec<RobloxVersion>, String> {
     Ok(list)
 }
 
+/// What was typed or chosen as a version: `version-b7e22355` as it is, or just the hash.
+fn normalize_version_input(raw: &str) -> String {
+    let t = raw.trim().to_ascii_lowercase();
+    if t.is_empty() || t.starts_with("version-") || !t.chars().all(|c| c.is_ascii_hexdigit()) {
+        t
+    } else {
+        format!("version-{t}")
+    }
+}
+
+/// A version that isn't on this PC has to exist on Roblox's servers. A server that says "not
+/// there" is believed; being offline (or any other answer) is not held against the version, the
+/// launch will find out.
+async fn check_version_exists(channel: &Option<String>, version: &str) -> Result<(), String> {
+    let client = reqwest::Client::builder()
+        .user_agent("Luna")
+        .timeout(Duration::from_secs(10))
+        .build()
+        .map_err(|e| e.to_string())?;
+    match client.get(format!("{}/{version}-rbxPkgManifest.txt", cdn_base(channel))).send().await {
+        Ok(r) if r.status() == reqwest::StatusCode::NOT_FOUND || r.status() == reqwest::StatusCode::FORBIDDEN => {
+            Err(format!("Roblox has no version called {version} on its servers (it may never have existed, or it was removed)."))
+        }
+        _ => Ok(()),
+    }
+}
+
 /// Settings -> Roblox: stay on this version (None goes back to always using the newest). The
-/// version is downloaded at the next launch if it isn't on disk yet.
+/// version may be one from the list or typed in by hand; it is downloaded at the next launch if
+/// it isn't on disk yet.
 #[tauri::command]
-pub fn set_roblox_pin(version: Option<String>) -> Result<(), String> {
-    let version = version.map(|v| v.trim().to_string()).filter(|v| !v.is_empty());
+pub async fn set_roblox_pin(version: Option<String>) -> Result<(), String> {
+    let version = version.map(|v| normalize_version_input(&v)).filter(|v| !v.is_empty());
     if let Some(v) = &version {
         check_version_name(v)?;
+        let on_disk = luna_versions_dir().map(|d| d.join(v).join(PLAYER_EXE).is_file()).unwrap_or(false);
+        if !on_disk {
+            let channel = normalize_channel(crate::settings::get_settings().ok().and_then(|s| s.release_channel).as_deref());
+            check_version_exists(&channel, v).await?;
+        }
     }
     let mut settings = crate::settings::get_settings()?;
     settings.pinned_roblox_version = version;
@@ -935,6 +968,14 @@ mod tests {
         assert_eq!(v[1].version, "version-bbbb2222");
         assert_eq!(v[1].date, "10/31/2024");
         assert_eq!(v[1].file_version, "0.647.0.6470544");
+    }
+
+    #[test]
+    fn typed_versions_are_tidied() {
+        assert_eq!(normalize_version_input("  version-B7E22355 "), "version-b7e22355");
+        assert_eq!(normalize_version_input("b7e22355"), "version-b7e22355");
+        assert_eq!(normalize_version_input("hello"), "hello"); // rejected later by the name check
+        assert_eq!(normalize_version_input("   "), "");
     }
 
     #[test]

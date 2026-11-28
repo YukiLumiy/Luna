@@ -34,7 +34,7 @@ git push origin HEAD --tags   # Actions がビルド・署名・公開
 ```
 tauri.conf.json の updater の endpoints は YukiLumiy/Luna を仮置きしています。
 
-## v0.2.0 〜 v0.2.3 で入ったもの
+## v0.2.0 〜 v0.2.4 で入ったもの
 - ブートストラッパー（src-tauri/src/bootstrap.rs）: 起動のたびに最新版を確認し、足りなければ Roblox の CDN からダウンロード（4並列・MD5検証・3回まで再試行）して `%LOCALAPPDATA%\\Luna\\Versions\\<version>` に展開。`<version>.partial` で作って完成後にリネームするので、`RobloxPlayerBeta.exe` がある版は必ず完全。古い版は Roblox 実行中でなければ削除。オフライン / 取得失敗時はインストール済みの版（なければ従来の `%LOCALAPPDATA%\\Roblox\\Versions`）で起動。Roblox 公式インストーラは使わない
 - 進捗はホーム画面（状態文 + 細いバー、Settings ボタンが Cancel に変わる）。`roblox-player:` リンクで起動した場合もこの窓が出る。`bootstrap-progress` / `launch-started` / `launch-failed` イベントで通知
 - プレイ中はウィンドウを隠す（Settings → Advanced → Hide Luna while playing）。リンクから起動された Luna は Roblox の終了時（キャッシュ処理の完了後）に自動で終了
@@ -45,6 +45,7 @@ tauri.conf.json の updater の endpoints は YukiLumiy/Luna を仮置きして�
 - v0.2.1: Settings → Server（現在/直近のサーバー、ping、人数、最近のゲーム、参加リンクのコピー。activity.rs の `ServerInfo`）、ゲームカードに ping と人数、カードは自分のフェードアウト終了後にウィンドウを閉じる（capabilities/popup.json）、登録スカイボックスのサムネイルは ft（なければ手元の1枚）、編集モードは外側クリックで終了（useOutsideDismiss.ts）、Roblox のバージョン表示と再インストール
 - v0.2.2: サーバー位置の取得を ipinfo.io 優先に変更（Roblox のアドレスは登録上すべて米国なので、登録地で答える ip-api だと日本のサーバーも United States になる）。二重起動エラーの抑止、再インストールの起動中ガード、未使用ファイルの削除（liquidGlass / sound / Glass* / SkyboxFixSection / windowEffects / Toggle / LaunchScreen / MoonIcon / glass.css / sfx）
 - v0.2.3: Settings → Roblox。バージョンの固定（`pinned_roblox_version`。一覧は setup.rbxcdn.com の DeployHistory.txt から最新40件。固定中は更新せず、その版が無ければ他の版で代用せずエラー）と、起動前のファイル検査（インストール時に各パッケージが書いたファイルのサイズと MD5 を `luna-manifest.json` に記録。通常は存在とサイズ、「Thorough check」は MD5 まで比較。壊れたパッケージだけ再ダウンロード。モッドが置き換えたファイル（mods の active_paths）は除外）。0.2.2 以前の Luna が入れた Roblox は記録が無いので検査できず、Reinstall Roblox が必要
+- v0.2.4: 一覧にないバージョンの手入力（`set_roblox_pin` が CDN に存在確認）。Roblox の窓の名前とアイコン（winbrand.rs: Win32 の EnumWindows / SendMessageTimeoutW / CreateIcon を直接宣言。タイトルが "Roblox" か "Luna : " で始まる窓だけ触り、1秒ごとに確認。名前は activity.rs の `set_game` で「Luna : ゲーム名」に。設定 `brand_roblox_window`）
 
 ## 次のステップ
 - Windows 実機での動作確認（ブートストラッパーの実ダウンロード、右下カード、ウィンドウの隠れ方）

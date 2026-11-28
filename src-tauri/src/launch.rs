@@ -200,7 +200,7 @@ async fn launch_inner(
     if hide {
         set_main_visible(app_handle, false);
     }
-    let stop_watching = crate::activity::start(app_handle.clone(), started);
+    let stop_watching = crate::activity::start(app_handle.clone(), started, child.id());
 
     let exit_handle = app_handle.clone();
     let quit_afterwards = from_link && STARTED_BY_LINK.load(Ordering::Relaxed);

@@ -111,6 +111,7 @@ fn record(app: &AppHandle, info: ServerInfo) {
 }
 
 fn mark_left(app: &AppHandle) {
+    crate::winbrand::set_game(None);
     {
         let mut state = lock();
         let Some(current) = state.current.as_mut() else { return };
@@ -217,20 +218,24 @@ fn newest_log_since(since: SystemTime) -> Option<PathBuf> {
 }
 
 /// Starts following the log of the Roblox that was just started. Set the returned flag to stop.
-pub(crate) fn start(app: AppHandle, started: SystemTime) -> Arc<AtomicBool> {
+pub(crate) fn start(app: AppHandle, started: SystemTime, pid: u32) -> Arc<AtomicBool> {
     let stop = Arc::new(AtomicBool::new(false));
     let flag = stop.clone();
-    tauri::async_runtime::spawn(async move { follow(app, started, flag).await });
+    tauri::async_runtime::spawn(async move { follow(app, started, pid, flag).await });
     stop
 }
 
-async fn follow(app: AppHandle, started: SystemTime, stop: Arc<AtomicBool>) {
+async fn follow(app: AppHandle, started: SystemTime, pid: u32, stop: Arc<AtomicBool>) {
     let mut parser = LogParser::new();
     let mut log: Option<PathBuf> = None;
     let mut offset = 0u64;
     let mut pending: Vec<u8> = Vec::new();
     // A join was seen: the card waits a moment for the log's remaining lines about the server.
     let mut joined_at: Option<Instant> = None;
+    // Roblox's window gets Luna's name and icon (and keeps them).
+    let brand = get_settings().map(|s| s.brand_roblox_window).unwrap_or(true);
+    let branding = Arc::new(Mutex::new(crate::winbrand::Branding::new()));
+    crate::winbrand::set_game(None);
 
     while !stop.load(Ordering::Relaxed) {
         if log.is_none() {
@@ -256,6 +261,16 @@ async fn follow(app: AppHandle, started: SystemTime, stop: Arc<AtomicBool>) {
             let app = app.clone();
             let session = parser.session();
             tauri::async_runtime::spawn(async move { announce(app, session).await });
+        }
+        if brand {
+            // On a thread of its own, and skipped while the last round is still running: a
+            // window that does not answer must never hold up the log.
+            let branding = branding.clone();
+            tokio::task::spawn_blocking(move || {
+                if let Ok(mut b) = branding.try_lock() {
+                    b.tick(pid);
+                }
+            });
         }
         tokio::time::sleep(Duration::from_millis(1000)).await;
     }
@@ -458,6 +473,8 @@ async fn announce(app: AppHandle, session: GameSession) {
         in_game: true,
     };
     record(&app, info.clone());
+    // the window is named after the game
+    crate::winbrand::set_game(Some(info.game.clone()));
 
     if get_settings().map(|s| s.game_popup).unwrap_or(true) {
         let theme = get_settings().map(|s| s.theme).unwrap_or_else(|_| "dark".to_string());

@@ -20,6 +20,7 @@ mod skyfix;
 mod sky;
 mod sky_presets;
 mod user_sky;
+mod winbrand;
 
 fn main() {
     std::thread::spawn(rpc::run_discord_rpc_watcher);
