@@ -52,6 +52,12 @@ pub struct LunaSettings {
     /// Show a card at the bottom right (game name and server location) when a game is joined.
     #[serde(default = "default_true")]
     pub game_popup: bool,
+    /// A Roblox version (`version-<hash>`) to stay on instead of updating, or none for the newest.
+    #[serde(default)]
+    pub pinned_roblox_version: Option<String>,
+    /// Check Roblox's files before every launch and repair what is damaged.
+    #[serde(default = "default_true")]
+    pub verify_before_launch: bool,
 }
 
 pub(crate) fn default_true() -> bool {
@@ -76,6 +82,8 @@ impl Default for LunaSettings {
             recache_auto: false,
             hide_window_on_launch: true,
             game_popup: true,
+            pinned_roblox_version: None,
+            verify_before_launch: true,
         }
     }
 }

@@ -28,7 +28,7 @@ export function errText(e: unknown): string {
 
 /** What the backend reports while it installs / updates Roblox (see bootstrap.rs). */
 export interface BootProgress {
-  stage: "checking" | "downloading" | "finalizing";
+  stage: "checking" | "downloading" | "finalizing" | "verifying";
   percent: number;
 }
 

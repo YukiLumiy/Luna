@@ -85,17 +85,42 @@ fn set_main_visible(app: &AppHandle, visible: bool) {
     }
 }
 
-/// Installs or updates Roblox and returns its folder. If that fails but a Roblox is already on
-/// this PC, that one is used: an old Roblox that starts beats a new one that doesn't.
+/// Installs or updates Roblox (or the version that is pinned), checks its files, and returns its
+/// folder. If installing fails but a Roblox is already on this PC, that one is used: an old
+/// Roblox that starts beats a new one that doesn't — except for a pinned version, which is
+/// never swapped for another.
 async fn prepare_roblox(app: &AppHandle) -> Result<PathBuf, String> {
-    let channel = get_settings().ok().and_then(|s| s.release_channel);
+    let settings = get_settings().ok();
+    let channel = settings.as_ref().and_then(|s| s.release_channel.clone());
+    let pinned = settings
+        .as_ref()
+        .and_then(|s| s.pinned_roblox_version.clone())
+        .filter(|v| !v.trim().is_empty());
+    let verify = settings.as_ref().map(|s| s.verify_before_launch).unwrap_or(true);
+
     let emitter = app.clone();
     let emit: Arc<dyn Fn(bootstrap::Progress) + Send + Sync> = Arc::new(move |progress| {
         let _ = emitter.emit("bootstrap-progress", progress);
     });
-    match bootstrap::ensure_latest(channel, emit).await {
-        Ok(installed) => Ok(installed.dir),
+    match bootstrap::ensure_latest(channel.clone(), pinned.clone(), emit.clone()).await {
+        Ok(installed) => {
+            // a version that was just downloaded has just been checked, file by file
+            if verify && !installed.updated {
+                emit(bootstrap::Progress { stage: "verifying", percent: 0.0 });
+                bootstrap::verify_and_repair(&installed.dir, &installed.version, false, channel, emit)
+                    .await
+                    .map_err(|e| {
+                        if e == bootstrap::CANCELLED {
+                            e
+                        } else {
+                            format!("Roblox's files are damaged and couldn't be repaired: {e}")
+                        }
+                    })?;
+            }
+            Ok(installed.dir)
+        }
         Err(e) if e == bootstrap::CANCELLED => Err(e),
+        Err(e) if pinned.is_some() => Err(e),
         Err(e) => match bootstrap::installed_version_dir() {
             Some(dir) => Ok(dir),
             None => crate::paths::legacy_version_folder().map_err(|_| e),

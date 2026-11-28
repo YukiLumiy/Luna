@@ -12,6 +12,7 @@
 //! The version is built in `<version>.partial` and renamed once complete, so a folder that has
 //! `RobloxPlayerBeta.exe` is always a whole install.
 
+use std::collections::{BTreeMap, HashSet};
 use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -43,7 +44,6 @@ pub struct Progress {
     pub percent: f32,
 }
 
-#[allow(dead_code)] // `version` and `updated` are for callers that want to tell the user what happened
 pub struct Installed {
     pub dir: PathBuf,
     pub version: String,
@@ -155,10 +155,7 @@ async fn fetch_latest(client: &reqwest::Client, channel: &Option<String>) -> Res
         .map_err(|e| e.to_string())?;
     let parsed: ClientVersion = response.json().await.map_err(|e| e.to_string())?;
     let version = parsed.client_version_upload;
-    // The name ends up in a folder path, so only the shape Roblox uses is accepted.
-    if !version.starts_with("version-") || !version.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') {
-        return Err(format!("Unexpected version name from Roblox: {version}"));
-    }
+    check_version_name(&version)?;
     Ok(version)
 }
 
@@ -247,10 +244,38 @@ fn md5_of(path: &Path) -> Result<String, String> {
     Ok(format!("{:x}", hasher.finalize()))
 }
 
-fn extract_zip(zip_path: &Path, dest: &Path) -> Result<(), String> {
+/// One file a package put into the version folder, kept so the install can be checked later.
+#[derive(Serialize, Deserialize, Clone)]
+pub(crate) struct FileRecord {
+    /// Path inside the version folder, with `/` separators.
+    p: String,
+    /// Size in bytes.
+    s: u64,
+    /// MD5 of the content.
+    h: String,
+}
+
+/// Written into every version folder Luna installs: what each package contributed.
+const MANIFEST_FILE: &str = "luna-manifest.json";
+
+#[derive(Serialize, Deserialize, Default)]
+struct InstallManifest {
+    version: String,
+    packages: BTreeMap<String, Vec<FileRecord>>,
+}
+
+fn read_install_manifest(dir: &Path) -> Option<InstallManifest> {
+    serde_json::from_str(&fs::read_to_string(dir.join(MANIFEST_FILE)).ok()?).ok()
+}
+
+/// Unpacks `zip_path` into `dest` (which is `prefix` below the version folder) and returns what
+/// it wrote, with size and checksum.
+fn extract_zip(zip_path: &Path, dest: &Path, prefix: &str) -> Result<Vec<FileRecord>, String> {
     let file = File::open(zip_path).map_err(|e| e.to_string())?;
     let mut archive =
         zip::ZipArchive::new(file).map_err(|e| format!("{}: {e}", zip_path.display()))?;
+    let mut records = Vec::new();
+    let mut buf = vec![0u8; 64 * 1024];
     for i in 0..archive.len() {
         let mut entry = archive.by_index(i).map_err(|e| e.to_string())?;
         let name = entry.name().to_string();
@@ -263,9 +288,22 @@ fn extract_zip(zip_path: &Path, dest: &Path) -> Result<(), String> {
             fs::create_dir_all(parent).map_err(|e| e.to_string())?;
         }
         let mut out = File::create(&target).map_err(|e| format!("{}: {e}", target.display()))?;
-        std::io::copy(&mut entry, &mut out).map_err(|e| format!("{}: {e}", target.display()))?;
+        let mut hasher = Md5::new();
+        let mut size = 0u64;
+        loop {
+            let n = entry.read(&mut buf).map_err(|e| format!("{}: {e}", target.display()))?;
+            if n == 0 {
+                break;
+            }
+            hasher.update(&buf[..n]);
+            out.write_all(&buf[..n]).map_err(|e| format!("{}: {e}", target.display()))?;
+            size += n as u64;
+        }
+        let rel: Vec<&str> = name.split(['/', '\\']).filter(|p| !p.is_empty() && *p != ".").collect();
+        let path = if prefix.is_empty() { rel.join("/") } else { format!("{prefix}/{}", rel.join("/")) };
+        records.push(FileRecord { p: path, s: size, h: format!("{:x}", hasher.finalize()) });
     }
-    Ok(())
+    Ok(records)
 }
 
 // ---------------------------------------------------------------------
@@ -345,6 +383,8 @@ struct Job {
     reporter: Reporter,
     /// Set when one worker fails, so the others stop too.
     abort: AtomicBool,
+    /// What every unpacked package wrote.
+    records: Mutex<BTreeMap<String, Vec<FileRecord>>>,
 }
 
 /// Takes packages one after another: download, check (three tries), unpack.
@@ -381,25 +421,19 @@ async fn worker(job: Arc<Job>) -> Result<(), String> {
             return Err(format!("Couldn't download {}: {last_error}", pkg.name));
         }
 
-        let dest = safe_join(&job.out, package_dir(&pkg.name))
-            .ok_or_else(|| format!("Bad folder for {}", pkg.name))?;
+        let prefix = package_dir(&pkg.name).to_string();
+        let dest = safe_join(&job.out, &prefix).ok_or_else(|| format!("Bad folder for {}", pkg.name))?;
         let unpack_from = zip_path.clone();
-        tokio::task::spawn_blocking(move || extract_zip(&unpack_from, &dest))
+        let records = tokio::task::spawn_blocking(move || extract_zip(&unpack_from, &dest, &prefix))
             .await
             .map_err(|e| e.to_string())??;
+        job.records.lock().unwrap_or_else(|e| e.into_inner()).insert(pkg.name.clone(), records);
         let _ = fs::remove_file(&zip_path);
     }
 }
 
-async fn install(
-    client: &reqwest::Client,
-    channel: &Option<String>,
-    version: &str,
-    versions: &Path,
-    emit: Arc<dyn Fn(Progress) + Send + Sync>,
-) -> Result<(), String> {
-    let base = cdn_base(channel);
-    let manifest = client
+async fn fetch_manifest(client: &reqwest::Client, base: &str, version: &str) -> Result<Vec<Package>, String> {
+    let text = client
         .get(format!("{base}/{version}-rbxPkgManifest.txt"))
         .send()
         .await
@@ -409,15 +443,30 @@ async fn install(
         .text()
         .await
         .map_err(|e| e.to_string())?;
-    let packages = parse_manifest(&manifest)?;
-    let total: u64 = packages.iter().map(|p| p.packed).sum();
+    parse_manifest(&text)
+}
 
-    let partial = versions.join(format!("{version}.partial"));
-    let downloads = versions.join(".downloads").join(version);
-    let _ = fs::remove_dir_all(&partial);
-    let _ = fs::remove_dir_all(&downloads);
-    fs::create_dir_all(&partial).map_err(|e| e.to_string())?;
-    fs::create_dir_all(&downloads).map_err(|e| e.to_string())?;
+fn build_client() -> Result<reqwest::Client, String> {
+    reqwest::Client::builder()
+        .user_agent("Luna")
+        .connect_timeout(Duration::from_secs(15))
+        .build()
+        .map_err(|e| e.to_string())
+}
+
+/// Downloads and unpacks `packages` into `out`, a few at a time; returns what they wrote.
+async fn run_packages(
+    client: &reqwest::Client,
+    base: String,
+    version: &str,
+    packages: Vec<Package>,
+    downloads: &Path,
+    out: &Path,
+    emit: Arc<dyn Fn(Progress) + Send + Sync>,
+) -> Result<BTreeMap<String, Vec<FileRecord>>, String> {
+    let total: u64 = packages.iter().map(|p| p.packed).sum();
+    let _ = fs::remove_dir_all(downloads);
+    fs::create_dir_all(downloads).map_err(|e| e.to_string())?;
 
     let workers = WORKERS.min(packages.len());
     let job = Arc::new(Job {
@@ -426,15 +475,11 @@ async fn install(
         version: version.to_string(),
         packages,
         next: AtomicUsize::new(0),
-        downloads: downloads.clone(),
-        out: partial.clone(),
-        reporter: Reporter {
-            emit: emit.clone(),
-            total,
-            done: AtomicU64::new(0),
-            last: Mutex::new(Instant::now()),
-        },
+        downloads: downloads.to_path_buf(),
+        out: out.to_path_buf(),
+        reporter: Reporter { emit, total, done: AtomicU64::new(0), last: Mutex::new(Instant::now()) },
         abort: AtomicBool::new(false),
+        records: Mutex::new(BTreeMap::new()),
     });
 
     let handles: Vec<_> = (0..workers).map(|_| tokio::spawn(worker(job.clone()))).collect();
@@ -452,18 +497,49 @@ async fn install(
             }
         }
     }
+    let _ = fs::remove_dir_all(downloads);
     if !errors.is_empty() {
-        let _ = fs::remove_dir_all(&partial);
-        let _ = fs::remove_dir_all(&downloads);
         // A real failure is worth more than the "Cancelled" the other workers answered with.
         let real = errors.iter().find(|e| e.as_str() != CANCELLED).cloned();
         return Err(real.unwrap_or_else(|| CANCELLED.to_string()));
     }
+    let records = std::mem::take(&mut *job.records.lock().unwrap_or_else(|e| e.into_inner()));
+    Ok(records)
+}
+
+async fn install(
+    client: &reqwest::Client,
+    channel: &Option<String>,
+    version: &str,
+    versions: &Path,
+    emit: Arc<dyn Fn(Progress) + Send + Sync>,
+) -> Result<(), String> {
+    let base = cdn_base(channel);
+    let packages = fetch_manifest(client, &base, version).await?;
+
+    let partial = versions.join(format!("{version}.partial"));
+    let downloads = versions.join(".downloads").join(version);
+    let _ = fs::remove_dir_all(&partial);
+    fs::create_dir_all(&partial).map_err(|e| e.to_string())?;
+
+    let records = match run_packages(client, base, version, packages, &downloads, &partial, emit.clone()).await {
+        Ok(r) => r,
+        Err(e) => {
+            let _ = fs::remove_dir_all(&partial);
+            return Err(e);
+        }
+    };
 
     emit(Progress { stage: "finalizing", percent: 100.0 });
     fs::write(
         partial.join("AppSettings.xml"),
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n<Settings>\r\n\t<ContentFolder>content</ContentFolder>\r\n\t<BaseUrl>http://www.roblox.com</BaseUrl>\r\n</Settings>\r\n",
+    )
+    .map_err(|e| e.to_string())?;
+    let manifest = InstallManifest { version: version.to_string(), packages: records };
+    fs::write(
+        partial.join(MANIFEST_FILE),
+        serde_json::to_string(&manifest).map_err(|e| e.to_string())?,
     )
     .map_err(|e| e.to_string())?;
     if !partial.join(PLAYER_EXE).is_file() {
@@ -475,8 +551,255 @@ async fn install(
         fs::remove_dir_all(&finished).map_err(|e| e.to_string())?;
     }
     fs::rename(&partial, &finished).map_err(|e| e.to_string())?;
-    let _ = fs::remove_dir_all(&downloads);
     Ok(())
+}
+
+// ---------------------------------------------------------------------
+// Checking and repairing an install
+// ---------------------------------------------------------------------
+
+/// The result of checking an install against what its packages wrote.
+#[derive(Serialize, Default, Clone)]
+pub struct VerifyReport {
+    /// Files compared.
+    pub checked: usize,
+    /// Files left out because a mod replaced them on purpose.
+    pub skipped_mods: usize,
+    pub bad_files: usize,
+    /// The packages that have a missing or changed file.
+    pub bad_packages: Vec<String>,
+    /// This install has no record of its files (it was made by an older Luna).
+    pub unverifiable: bool,
+}
+
+/// Compares the files of a version folder with the record made when it was installed: every
+/// file must exist with its size and, when `deep`, its checksum. `skip` holds lower-case paths
+/// that mods replaced.
+pub(crate) fn verify_install(dir: &Path, deep: bool, skip: &HashSet<String>) -> VerifyReport {
+    let Some(manifest) = read_install_manifest(dir) else {
+        return VerifyReport { unverifiable: true, ..Default::default() };
+    };
+    let mut report = VerifyReport::default();
+    for (package, files) in &manifest.packages {
+        let mut damaged = false;
+        for file in files {
+            if skip.contains(&file.p.to_ascii_lowercase()) {
+                report.skipped_mods += 1;
+                continue;
+            }
+            report.checked += 1;
+            let path = dir.join(&file.p);
+            let fine = match fs::metadata(&path) {
+                Ok(meta) if meta.is_file() && meta.len() == file.s => {
+                    !deep || md5_of(&path).map_or(false, |h| h == file.h)
+                }
+                _ => false,
+            };
+            if !fine {
+                report.bad_files += 1;
+                damaged = true;
+            }
+        }
+        if damaged {
+            report.bad_packages.push(package.clone());
+        }
+    }
+    report
+}
+
+/// The files mods have put over Roblox's own (relative, lower-case, `/`-separated).
+fn modded_paths(dir: &Path) -> HashSet<String> {
+    crate::mods::load_manifest(dir)
+        .map(|m| m.active_paths.iter().map(|p| p.replace('\\', "/").to_ascii_lowercase()).collect())
+        .unwrap_or_default()
+}
+
+/// Downloads the named packages of `version` again over the install in `dir`.
+async fn repair(
+    channel: Option<String>,
+    dir: &Path,
+    version: &str,
+    names: &[String],
+    emit: Arc<dyn Fn(Progress) + Send + Sync>,
+) -> Result<(), String> {
+    let channel = normalize_channel(channel.as_deref());
+    let client = build_client()?;
+    let base = cdn_base(&channel);
+    let wanted: Vec<Package> = fetch_manifest(&client, &base, version)
+        .await?
+        .into_iter()
+        .filter(|p| names.contains(&p.name))
+        .collect();
+    if wanted.is_empty() {
+        return Err("Roblox no longer lists the damaged part of this version".to_string());
+    }
+    let downloads = luna_versions_dir()?.join(".downloads").join(format!("{version}-repair"));
+    let records = run_packages(&client, base, version, wanted, &downloads, dir, emit).await?;
+    let mut manifest = read_install_manifest(dir).unwrap_or_default();
+    manifest.version = version.to_string();
+    manifest.packages.extend(records);
+    fs::write(
+        dir.join(MANIFEST_FILE),
+        serde_json::to_string(&manifest).map_err(|e| e.to_string())?,
+    )
+    .map_err(|e| e.to_string())
+}
+
+#[derive(Serialize, Clone)]
+pub struct VerifyOutcome {
+    pub checked: usize,
+    /// Packages that were damaged and have been downloaded again.
+    pub repaired: Vec<String>,
+    pub unverifiable: bool,
+}
+
+/// Checks the install in `dir` (the version `version`) and repairs what is damaged. A mod's
+/// files are never counted as damage.
+pub(crate) async fn verify_and_repair(
+    dir: &Path,
+    version: &str,
+    deep: bool,
+    channel: Option<String>,
+    emit: Arc<dyn Fn(Progress) + Send + Sync>,
+) -> Result<VerifyOutcome, String> {
+    let skip = modded_paths(dir);
+    let check_dir = dir.to_path_buf();
+    let check_skip = skip.clone();
+    let report = tokio::task::spawn_blocking(move || verify_install(&check_dir, deep, &check_skip))
+        .await
+        .map_err(|e| e.to_string())?;
+    if report.unverifiable {
+        return Ok(VerifyOutcome { checked: 0, repaired: Vec::new(), unverifiable: true });
+    }
+    if report.bad_packages.is_empty() {
+        return Ok(VerifyOutcome { checked: report.checked, repaired: Vec::new(), unverifiable: false });
+    }
+
+    CANCEL.store(false, Ordering::Relaxed);
+    repair(channel, dir, version, &report.bad_packages, emit).await?;
+
+    // it must be whole now
+    let check_dir = dir.to_path_buf();
+    let again = tokio::task::spawn_blocking(move || verify_install(&check_dir, deep, &skip))
+        .await
+        .map_err(|e| e.to_string())?;
+    if !again.bad_packages.is_empty() {
+        return Err(format!("{} files are still wrong after downloading them again", again.bad_files));
+    }
+    Ok(VerifyOutcome { checked: again.checked, repaired: report.bad_packages, unverifiable: false })
+}
+
+// ---------------------------------------------------------------------
+// Versions
+// ---------------------------------------------------------------------
+
+fn check_version_name(version: &str) -> Result<(), String> {
+    // The name ends up in a folder path and a URL, so only the shape Roblox uses is accepted.
+    if version.starts_with("version-") && version.len() > 8 && version.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') {
+        Ok(())
+    } else {
+        Err(format!("Not a Roblox version name: {version}"))
+    }
+}
+
+#[derive(Serialize, Debug, PartialEq)]
+pub struct RobloxVersion {
+    version: String,
+    /// "10/31/2024" (the date Roblox released it)
+    date: String,
+    /// "0.647.0.6470544"
+    file_version: String,
+    /// Luna has this version on disk.
+    installed: bool,
+}
+
+/// The Windows player releases listed in Roblox's DeployHistory.txt, oldest first.
+fn parse_deploy_history(text: &str) -> Vec<RobloxVersion> {
+    let Ok(line) = regex::Regex::new(
+        r"^New WindowsPlayer (version-[0-9a-fA-F]+) at (\d+/\d+/\d+) [^,]*, file version: (\d+), (\d+), (\d+), (\d+)",
+    ) else {
+        return Vec::new();
+    };
+    let mut seen = HashSet::new();
+    let mut out = Vec::new();
+    for l in text.lines() {
+        if let Some(c) = line.captures(l.trim()) {
+            if seen.insert(c[1].to_string()) {
+                out.push(RobloxVersion {
+                    version: c[1].to_string(),
+                    date: c[2].to_string(),
+                    file_version: format!("{}.{}.{}.{}", &c[3], &c[4], &c[5], &c[6]),
+                    installed: false,
+                });
+            }
+        }
+    }
+    out
+}
+
+/// Settings -> Roblox -> versions: the latest releases, newest first.
+#[tauri::command]
+pub async fn list_roblox_versions() -> Result<Vec<RobloxVersion>, String> {
+    let channel = normalize_channel(crate::settings::get_settings().ok().and_then(|s| s.release_channel).as_deref());
+    let client = reqwest::Client::builder()
+        .user_agent("Luna")
+        .timeout(Duration::from_secs(30))
+        .build()
+        .map_err(|e| e.to_string())?;
+    let text = client
+        .get(format!("{}/DeployHistory.txt", cdn_base(&channel)))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?
+        .error_for_status()
+        .map_err(|e| e.to_string())?
+        .text()
+        .await
+        .map_err(|e| e.to_string())?;
+    let versions_dir = luna_versions_dir()?;
+    let mut list = parse_deploy_history(&text);
+    list.reverse();
+    list.truncate(40);
+    for v in &mut list {
+        v.installed = versions_dir.join(&v.version).join(PLAYER_EXE).is_file();
+    }
+    if list.is_empty() {
+        return Err("Roblox's release list had no versions in it".to_string());
+    }
+    Ok(list)
+}
+
+/// Settings -> Roblox: stay on this version (None goes back to always using the newest). The
+/// version is downloaded at the next launch if it isn't on disk yet.
+#[tauri::command]
+pub fn set_roblox_pin(version: Option<String>) -> Result<(), String> {
+    let version = version.map(|v| v.trim().to_string()).filter(|v| !v.is_empty());
+    if let Some(v) = &version {
+        check_version_name(v)?;
+    }
+    let mut settings = crate::settings::get_settings()?;
+    settings.pinned_roblox_version = version;
+    crate::settings::update_settings(settings)
+}
+
+/// Settings -> Roblox -> Check files: compares every file with the install record and downloads
+/// damaged parts again. `deep` also compares checksums (slower, finds changed contents).
+#[tauri::command]
+pub async fn verify_roblox_files(app: tauri::AppHandle, deep: bool) -> Result<VerifyOutcome, String> {
+    use tauri::Emitter;
+    if crate::launch::is_starting() {
+        return Err("Roblox is being started right now — try again once it is running.".to_string());
+    }
+    if let Some(message) = crate::cache::running_message("check its files") {
+        return Err(message);
+    }
+    let (dir, version) = installed_version().ok_or("Luna hasn't installed Roblox yet — launch it once first.")?;
+    let channel = crate::settings::get_settings().ok().and_then(|s| s.release_channel);
+    let emitter = app.clone();
+    let emit: Arc<dyn Fn(Progress) + Send + Sync> = Arc::new(move |p| {
+        let _ = emitter.emit("bootstrap-progress", p);
+    });
+    verify_and_repair(&dir, &version, deep, channel, emit).await
 }
 
 /// Removes the versions Luna installed earlier (never while Roblox is running, and never the
@@ -496,30 +819,35 @@ fn prune(versions: &Path, keep: &str) {
     }
 }
 
-/// Makes sure the newest Roblox is installed and returns where. Offline (or with Roblox's
-/// version service down) the installed version is used as it is.
+/// Makes sure the wanted Roblox is installed and returns where: the version `pinned` names, or
+/// the newest. Offline (or with Roblox's version service down) the installed version is used as
+/// it is — unless a version is pinned and missing, which can't be answered with another one.
 pub async fn ensure_latest(
     channel: Option<String>,
+    pinned: Option<String>,
     emit: Arc<dyn Fn(Progress) + Send + Sync>,
 ) -> Result<Installed, String> {
     CANCEL.store(false, Ordering::Relaxed);
     let channel = normalize_channel(channel.as_deref());
     emit(Progress { stage: "checking", percent: 0.0 });
 
-    let client = reqwest::Client::builder()
-        .user_agent("Luna")
-        .connect_timeout(Duration::from_secs(15))
-        .build()
-        .map_err(|e| e.to_string())?;
+    let client = build_client()?;
 
-    let latest = match fetch_latest(&client, &channel).await {
-        Ok(v) => v,
-        Err(e) => {
-            return match installed_version() {
-                Some((dir, version)) => Ok(Installed { dir, version, updated: false }),
-                None => Err(format!("Couldn't reach Roblox to download it: {e}")),
-            };
+    let pinned = pinned.map(|v| v.trim().to_string()).filter(|v| !v.is_empty());
+    let latest = match &pinned {
+        Some(version) => {
+            check_version_name(version)?;
+            version.clone()
         }
+        None => match fetch_latest(&client, &channel).await {
+            Ok(v) => v,
+            Err(e) => {
+                return match installed_version() {
+                    Some((dir, version)) => Ok(Installed { dir, version, updated: false }),
+                    None => Err(format!("Couldn't reach Roblox to download it: {e}")),
+                };
+            }
+        },
     };
 
     let versions = luna_versions_dir()?;
@@ -597,6 +925,77 @@ mod tests {
         assert!(safe_join(base, "../evil").is_none());
         assert!(safe_join(base, "a/../../evil").is_none());
         assert!(safe_join(base, "C:/evil").is_none());
+    }
+
+    #[test]
+    fn deploy_history_is_read_and_deduplicated() {
+        let text = "New WindowsPlayer version-aaaa1111 at 10/30/2024 9:01:02 AM, file version: 0, 646, 0, 6460001, git hash: abc ...\r\nNew Studio64 version-ffff at 10/30/2024 9:05:00 AM, file version: 0, 646, 0, 1, git hash: x\r\nNew WindowsPlayer version-bbbb2222 at 10/31/2024 1:22:41 PM, file version: 0, 647, 0, 6470544, git hash: abc ...\r\nNew WindowsPlayer version-bbbb2222 at 11/1/2024 1:22:41 PM, file version: 0, 647, 0, 6470544, git hash: abc ...\r\nDone\r\n";
+        let v = parse_deploy_history(text);
+        assert_eq!(v.len(), 2);
+        assert_eq!(v[1].version, "version-bbbb2222");
+        assert_eq!(v[1].date, "10/31/2024");
+        assert_eq!(v[1].file_version, "0.647.0.6470544");
+    }
+
+    #[test]
+    fn version_names_are_checked() {
+        assert!(check_version_name("version-0a1b2c3d4e5f").is_ok());
+        assert!(check_version_name("version-").is_err());
+        assert!(check_version_name("../version-abc").is_err());
+        assert!(check_version_name("abc").is_err());
+    }
+
+    #[test]
+    fn an_install_is_verified_against_its_record() {
+        let root = std::env::temp_dir().join("luna-verify-test");
+        let _ = fs::remove_dir_all(&root);
+        let dir = root.join("version-test");
+        fs::create_dir_all(dir.join("content/sky")).unwrap();
+
+        // a package with two files
+        let zip_path = root.join("p.zip");
+        {
+            let mut w = zip::ZipWriter::new(File::create(&zip_path).unwrap());
+            let opts = zip::write::SimpleFileOptions::default();
+            w.start_file("sky_bk.tex", opts).unwrap();
+            w.write_all(b"back").unwrap();
+            w.start_file("sub\\sky_ft.tex", opts).unwrap();
+            w.write_all(b"front").unwrap();
+            w.finish().unwrap();
+        }
+        let records = extract_zip(&zip_path, &dir.join("content/sky"), "content/sky").unwrap();
+        assert_eq!(records.len(), 2);
+        assert!(records.iter().any(|r| r.p == "content/sky/sub/sky_ft.tex" && r.s == 5));
+        let mut packages = BTreeMap::new();
+        packages.insert("content-sky.zip".to_string(), records);
+        fs::write(
+            dir.join(MANIFEST_FILE),
+            serde_json::to_string(&InstallManifest { version: "version-test".into(), packages }).unwrap(),
+        )
+        .unwrap();
+
+        let none = HashSet::new();
+        assert!(verify_install(&dir, true, &none).bad_packages.is_empty());
+
+        // same size, different content: only the thorough check sees it
+        fs::write(dir.join("content/sky/sky_bk.tex"), b"BACK").unwrap();
+        assert!(verify_install(&dir, false, &none).bad_packages.is_empty());
+        let deep = verify_install(&dir, true, &none);
+        assert_eq!(deep.bad_packages, vec!["content-sky.zip".to_string()]);
+
+        // ...unless a mod replaced that file on purpose
+        let modded: HashSet<String> = ["content/sky/sky_bk.tex".to_string()].into();
+        let skipped = verify_install(&dir, true, &modded);
+        assert!(skipped.bad_packages.is_empty());
+        assert_eq!(skipped.skipped_mods, 1);
+
+        // a missing file shows up even in the quick check
+        fs::remove_file(dir.join("content/sky/sub/sky_ft.tex")).unwrap();
+        assert_eq!(verify_install(&dir, false, &modded).bad_files, 1);
+
+        // no record: it can't be judged
+        fs::remove_file(dir.join(MANIFEST_FILE)).unwrap();
+        assert!(verify_install(&dir, false, &none).unverifiable);
     }
 
     #[test]

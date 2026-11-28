@@ -9,6 +9,7 @@ import { UpdateSection } from "./UpdateSection";
 import { FFlagPresetsSection } from "./FFlagPresetsSection";
 import { FFlagProfilesSection } from "./FFlagProfilesSection";
 import { ServerSection } from "./ServerSection";
+import { RobloxSection } from "./RobloxSection";
 import { AdvancedSection } from "./AdvancedSection";
 import { useArmed } from "../useArmed";
 import { useOutsideDismiss } from "../useOutsideDismiss";
@@ -139,6 +140,7 @@ export function SettingsScreen({ onBack, onProfilesChanged }: SettingsScreenProp
       <FFlagPresetsSection />
       <FastFlagsSection />
       <FFlagProfilesSection />
+      <RobloxSection />
       <ServerSection />
       <AdvancedSection />
 

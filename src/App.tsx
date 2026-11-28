@@ -122,6 +122,7 @@ export default function App() {
     booting && boot.stage === "checking" ? t("boot.checking")
     : booting && boot.stage === "downloading" ? t("boot.downloading", { p: Math.floor(boot.percent) })
     : booting && boot.stage === "finalizing" ? t("boot.finalizing")
+    : booting && boot.stage === "verifying" ? t("boot.verifying")
     : state === "launching" ? t("home.launching")
     : state === "running" ? t("home.running")
     : state === "error" ? errorMessage ?? t("home.failed")
@@ -146,7 +147,7 @@ export default function App() {
                 <p key={booting ? `boot-${boot.stage}` : statusText} className={`welcome-status ${state === "error" ? "welcome-status--error" : ""} ${busy ? "welcome-status--busy" : ""}`}>
                   {statusText}
                 </p>
-                {booting && boot.stage !== "checking" && (
+                {booting && (boot.stage === "downloading" || boot.stage === "finalizing") && (
                   <div className="boot" aria-hidden>
                     <div className="boot-bar"><i style={{ width: `${boot.percent}%` }} /></div>
                   </div>

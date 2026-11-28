@@ -23,7 +23,7 @@ pub struct Manifest {
     /// Relative paths (e.g. "content/fonts/families/Roboto.json") currently
     /// overlaid, keyed to nothing else — the backup for each lives at a
     /// predictable path derived from it.
-    active_paths: HashSet<String>,
+    pub(crate) active_paths: HashSet<String>,
     /// Overlaid paths that did not exist in the stock install, so Luna made
     /// them. Disabling the profile must delete these (there is no stock file
     /// to put back), otherwise e.g. a mirrored skybox would outlive its mod.
