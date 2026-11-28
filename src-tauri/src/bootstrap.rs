@@ -443,7 +443,22 @@ async fn fetch_manifest(client: &reqwest::Client, base: &str, version: &str) -> 
         .text()
         .await
         .map_err(|e| e.to_string())?;
-    parse_manifest(&text)
+    playable_packages(parse_manifest(&text)?)
+}
+
+/// The packages to download: the zip files. Older versions also list installer programs
+/// (`RobloxPlayerInstaller.exe`, `RobloxPlayerLauncher.exe`) in their manifest; those are plain
+/// files, not zips, and the player does not need them, so they are left out.
+fn playable_packages(packages: Vec<Package>) -> Result<Vec<Package>, String> {
+    let zips: Vec<Package> = packages
+        .into_iter()
+        .filter(|p| p.name.to_ascii_lowercase().ends_with(".zip"))
+        .collect();
+    if zips.is_empty() {
+        Err("The package manifest has no zip packages".to_string())
+    } else {
+        Ok(zips)
+    }
 }
 
 fn build_client() -> Result<reqwest::Client, String> {
@@ -1023,6 +1038,15 @@ mod tests {
         assert_eq!(normalize_version_input("b7e22355"), "version-b7e22355");
         assert_eq!(normalize_version_input("hello"), "hello"); // rejected later by the name check
         assert_eq!(normalize_version_input("   "), "");
+    }
+
+    #[test]
+    fn installer_programs_in_old_manifests_are_not_downloaded() {
+        let text = "v0\nRobloxPlayerInstaller.exe\n0123\n10\n20\nRobloxApp.zip\nabcd\n30\n60\nRobloxPlayerLauncher.exe\nffff\n5\n9\ncontent-sky.zip\n1111\n7\n14\n";
+        let kept = playable_packages(parse_manifest(text).unwrap()).unwrap();
+        let names: Vec<&str> = kept.iter().map(|p| p.name.as_str()).collect();
+        assert_eq!(names, vec!["RobloxApp.zip", "content-sky.zip"]);
+        assert!(playable_packages(parse_manifest("v0\nRobloxPlayerInstaller.exe\n0123\n10\n20\n").unwrap()).is_err());
     }
 
     #[test]
