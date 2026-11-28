@@ -11,12 +11,19 @@ interface RobloxVersion {
   date: string;
   file_version: string;
   installed: boolean;
+  in_use: boolean;
+}
+
+interface VersionList {
+  versions: RobloxVersion[];
+  current: RobloxVersion | null;
 }
 
 interface VerifyOutcome {
   checked: number;
   repaired: string[];
   unverifiable: boolean;
+  still_differs: number;
 }
 
 interface RobloxSettings {
@@ -26,7 +33,7 @@ interface RobloxSettings {
 }
 
 /** The last list that was fetched: shown at once when Settings is opened again, then refreshed. */
-let cachedVersions: RobloxVersion[] | null = null;
+let cachedVersions: VersionList | null = null;
 
 /** Saves a change to the settings without touching the other fields. */
 async function patchSettings(patch: Partial<RobloxSettings>): Promise<RobloxSettings> {
@@ -40,7 +47,9 @@ async function patchSettings(patch: Partial<RobloxSettings>): Promise<RobloxSett
 export function RobloxSection() {
   const t = useT();
   const [settings, setSettings] = useState<RobloxSettings | null>(null);
-  const [versions, setVersions] = useState<RobloxVersion[] | null>(cachedVersions);
+  const [list, setList] = useState<VersionList | null>(cachedVersions);
+  // The version Luna has installed now (its hash), None-like when there is none yet.
+  const [installed, setInstalled] = useState<string | null | undefined>(undefined);
   const [manual, setManual] = useState("");
   const [picked, setPicked] = useState<string | null>(null);
   const [loadingList, setLoadingList] = useState(false);
@@ -51,6 +60,7 @@ export function RobloxSection() {
 
   useEffect(() => {
     invoke<RobloxSettings>("get_settings").then(setSettings).catch((e) => setError(String(e)));
+    void loadInstalled();
     // the list is there without pressing anything, and is fetched again on every visit
     void showVersions();
     // a repair downloads files: its progress arrives here
@@ -61,14 +71,36 @@ export function RobloxSection() {
   }, []);
 
   const pinned = settings?.pinned_roblox_version ?? null;
+  const versions = list?.versions ?? null;
+  const newest = versions?.[0] ?? null;
+  const current = list?.current ?? null;
+
+  async function loadInstalled() {
+    try {
+      setInstalled((await invoke<{ version: string | null }>("get_roblox_install")).version);
+    } catch {
+      setInstalled(null);
+    }
+  }
+
+  // What the next launch will do about the version.
+  const note = !installed
+    ? installed === null
+      ? t("roblox.nextFirst")
+      : null
+    : pinned && pinned !== installed
+      ? t("roblox.nextPinned", { v: pinned })
+      : !pinned && newest && newest.version !== installed
+        ? t("roblox.nextNewer", { v: newest.file_version })
+        : null;
 
   async function showVersions() {
     setLoadingList(true);
     setError(null);
     try {
-      const list = await invoke<RobloxVersion[]>("list_roblox_versions");
-      cachedVersions = list;
-      setVersions(list);
+      const fresh = await invoke<VersionList>("list_roblox_versions");
+      cachedVersions = fresh;
+      setList(fresh);
     } catch (e) {
       // an older list that is still on screen stays useful
       setError(String(e));
@@ -86,6 +118,7 @@ export function RobloxSection() {
       setPicked(null);
       setManual("");
       setMessage(version ? t("roblox.pinned") : t("roblox.unpinned"));
+      void loadInstalled();
     } catch (e) {
       setError(String(e));
     }
@@ -108,6 +141,7 @@ export function RobloxSection() {
     try {
       const r = await invoke<VerifyOutcome>("verify_roblox_files", { deep });
       if (r.unverifiable) setMessage(t("roblox.unverifiable"));
+      else if (r.still_differs > 0) setMessage(t("roblox.stillDiffers", { n: r.still_differs }));
       else if (r.repaired.length > 0) setMessage(t("roblox.repaired", { n: r.repaired.length }));
       else setMessage(t("roblox.allGood", { n: r.checked.toLocaleString() }));
     } catch (e) {
@@ -122,13 +156,19 @@ export function RobloxSection() {
     <section className="appearance-block">
       <h3>{t("roblox.heading")}</h3>
 
-      <div className="field-row">
-        <div className="field-text">
-          <span className="field-label">{t("roblox.version")}</span>
-          <p className="appearance-hint">
-            {pinned ? t("roblox.usingPinned", { v: pinned }) : t("roblox.usingNewest")}
-          </p>
+      <div className={`server-card version-card ${installed ? "server-card--live" : ""}`}>
+        <span className="server-card-head">{t("roblox.inUse")}</span>
+        <strong className="version-card-number">
+          {installed === undefined ? "…" : installed ? (current?.file_version ?? installed) : t("roblox.notInstalled")}
+        </strong>
+        {installed && <span className="server-meta">{[installed, current?.date].filter(Boolean).join(" · ")}</span>}
+        <div className="server-chips">
+          <span className={`server-chip ${pinned ? "server-chip--ok" : "server-chip--good"}`}>
+            {pinned ? t("roblox.chipPinned") : t("roblox.chipAuto")}
+          </span>
+          {newest && installed === newest.version && <span className="server-chip">{t("roblox.tagNewest")}</span>}
         </div>
+        {note && <p className="appearance-hint version-card-note">{note}</p>}
       </div>
       <p className="appearance-hint">{t("roblox.versionHint")}</p>
 
@@ -158,8 +198,9 @@ export function RobloxSection() {
                 </span>
                 <span className="version-tags">
                   {i === 0 && <span className="server-chip">{t("roblox.tagNewest")}</span>}
-                  {v.version === pinned && <span className="server-chip server-chip--good">{t("roblox.tagPinned")}</span>}
-                  {v.installed && v.version !== pinned && <span className="server-chip server-chip--dim">{t("roblox.tagInstalled")}</span>}
+                  {v.version === pinned && <span className="server-chip server-chip--ok">{t("roblox.tagPinned")}</span>}
+                  {v.version === installed && <span className="server-chip server-chip--good">{t("roblox.tagInUse")}</span>}
+                  {v.installed && v.version !== installed && <span className="server-chip server-chip--dim">{t("roblox.tagInstalled")}</span>}
                 </span>
               </button>
             ))}

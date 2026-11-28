@@ -55,6 +55,7 @@ export default function App() {
     });
     // A play link started a launch: this window shows its progress like the button's.
     const unBegin = listen("launch-started", () => {
+      setBoot(null);
       setState("launching");
       setErrorMessage(null);
     });
@@ -100,6 +101,7 @@ export default function App() {
   }
 
   async function handleLaunch() {
+    setBoot(null);
     setState("launching");
     setErrorMessage(null);
     try {

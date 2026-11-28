@@ -568,6 +568,8 @@ pub struct VerifyReport {
     pub bad_files: usize,
     /// The packages that have a missing or changed file.
     pub bad_packages: Vec<String>,
+    /// (package, path) of every file that differs.
+    pub bad_paths: Vec<(String, String)>,
     /// This install has no record of its files (it was made by an older Luna).
     pub unverifiable: bool,
 }
@@ -597,6 +599,7 @@ pub(crate) fn verify_install(dir: &Path, deep: bool, skip: &HashSet<String>) -> 
             };
             if !fine {
                 report.bad_files += 1;
+                report.bad_paths.push((package.clone(), file.p.clone()));
                 damaged = true;
             }
         }
@@ -651,6 +654,22 @@ pub struct VerifyOutcome {
     /// Packages that were damaged and have been downloaded again.
     pub repaired: Vec<String>,
     pub unverifiable: bool,
+    /// Files that still differ after a fresh download (something else keeps changing them).
+    /// They are no longer checked, so one stubborn file can't cause a download at every launch.
+    pub still_differs: usize,
+}
+
+/// Stops checking the given files: they are taken out of the install record.
+fn forget_files(dir: &Path, files: &[(String, String)]) {
+    let Some(mut manifest) = read_install_manifest(dir) else { return };
+    for (package, path) in files {
+        if let Some(list) = manifest.packages.get_mut(package) {
+            list.retain(|f| &f.p != path);
+        }
+    }
+    if let Ok(raw) = serde_json::to_string(&manifest) {
+        let _ = fs::write(dir.join(MANIFEST_FILE), raw);
+    }
 }
 
 /// Checks the install in `dir` (the version `version`) and repairs what is damaged. A mod's
@@ -669,10 +688,10 @@ pub(crate) async fn verify_and_repair(
         .await
         .map_err(|e| e.to_string())?;
     if report.unverifiable {
-        return Ok(VerifyOutcome { checked: 0, repaired: Vec::new(), unverifiable: true });
+        return Ok(VerifyOutcome { checked: 0, repaired: Vec::new(), unverifiable: true, still_differs: 0 });
     }
     if report.bad_packages.is_empty() {
-        return Ok(VerifyOutcome { checked: report.checked, repaired: Vec::new(), unverifiable: false });
+        return Ok(VerifyOutcome { checked: report.checked, repaired: Vec::new(), unverifiable: false, still_differs: 0 });
     }
 
     CANCEL.store(false, Ordering::Relaxed);
@@ -683,10 +702,18 @@ pub(crate) async fn verify_and_repair(
     let again = tokio::task::spawn_blocking(move || verify_install(&check_dir, deep, &skip))
         .await
         .map_err(|e| e.to_string())?;
-    if !again.bad_packages.is_empty() {
-        return Err(format!("{} files are still wrong after downloading them again", again.bad_files));
+    // A file that is still different after a fresh download is not Roblox's damage (two
+    // packages that write the same file, a program that rewrites it). It must not stop the
+    // launch, and it must not be fetched again every time: it is simply left out from now on.
+    if !again.bad_paths.is_empty() {
+        forget_files(dir, &again.bad_paths);
     }
-    Ok(VerifyOutcome { checked: again.checked, repaired: report.bad_packages, unverifiable: false })
+    Ok(VerifyOutcome {
+        checked: again.checked,
+        repaired: report.bad_packages,
+        unverifiable: false,
+        still_differs: again.bad_files,
+    })
 }
 
 // ---------------------------------------------------------------------
@@ -702,7 +729,7 @@ fn check_version_name(version: &str) -> Result<(), String> {
     }
 }
 
-#[derive(Serialize, Debug, PartialEq)]
+#[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct RobloxVersion {
     version: String,
     /// "10/31/2024" (the date Roblox released it)
@@ -711,6 +738,17 @@ pub struct RobloxVersion {
     file_version: String,
     /// Luna has this version on disk.
     installed: bool,
+    /// This is the version Luna launches right now (the one that is installed and current).
+    in_use: bool,
+}
+
+/// What Settings -> Roblox -> versions gets.
+#[derive(Serialize)]
+pub struct RobloxVersionList {
+    /// The latest releases, newest first.
+    versions: Vec<RobloxVersion>,
+    /// The version in use, even when it is older than the list reaches.
+    current: Option<RobloxVersion>,
 }
 
 /// The Windows player releases listed in Roblox's DeployHistory.txt, oldest first.
@@ -730,6 +768,7 @@ fn parse_deploy_history(text: &str) -> Vec<RobloxVersion> {
                     date: c[2].to_string(),
                     file_version: format!("{}.{}.{}.{}", &c[3], &c[4], &c[5], &c[6]),
                     installed: false,
+                    in_use: false,
                 });
             }
         }
@@ -739,7 +778,7 @@ fn parse_deploy_history(text: &str) -> Vec<RobloxVersion> {
 
 /// Settings -> Roblox -> versions: the latest releases, newest first.
 #[tauri::command]
-pub async fn list_roblox_versions() -> Result<Vec<RobloxVersion>, String> {
+pub async fn list_roblox_versions() -> Result<RobloxVersionList, String> {
     let channel = normalize_channel(crate::settings::get_settings().ok().and_then(|s| s.release_channel).as_deref());
     let client = reqwest::Client::builder()
         .user_agent("Luna")
@@ -757,16 +796,19 @@ pub async fn list_roblox_versions() -> Result<Vec<RobloxVersion>, String> {
         .await
         .map_err(|e| e.to_string())?;
     let versions_dir = luna_versions_dir()?;
-    let mut list = parse_deploy_history(&text);
-    list.reverse();
-    list.truncate(40);
-    for v in &mut list {
+    let in_use = installed_version().map(|(_, v)| v);
+    let mut all = parse_deploy_history(&text);
+    for v in &mut all {
         v.installed = versions_dir.join(&v.version).join(PLAYER_EXE).is_file();
+        v.in_use = in_use.as_deref() == Some(v.version.as_str());
     }
-    if list.is_empty() {
+    let current = all.iter().find(|v| v.in_use).cloned();
+    all.reverse();
+    all.truncate(40);
+    if all.is_empty() {
         return Err("Roblox's release list had no versions in it".to_string());
     }
-    Ok(list)
+    Ok(RobloxVersionList { versions: all, current })
 }
 
 /// What was typed or chosen as a version: `version-b7e22355` as it is, or just the hash.
@@ -1033,6 +1075,12 @@ mod tests {
         // a missing file shows up even in the quick check
         fs::remove_file(dir.join("content/sky/sub/sky_ft.tex")).unwrap();
         assert_eq!(verify_install(&dir, false, &modded).bad_files, 1);
+
+        // a file that stays different is dropped from the record, so it is not asked about again
+        let still = verify_install(&dir, false, &modded);
+        assert_eq!(still.bad_paths.len(), 1);
+        forget_files(&dir, &still.bad_paths);
+        assert!(verify_install(&dir, false, &modded).bad_packages.is_empty());
 
         // no record: it can't be judged
         fs::remove_file(dir.join(MANIFEST_FILE)).unwrap();
