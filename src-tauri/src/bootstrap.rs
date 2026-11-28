@@ -185,11 +185,13 @@ fn parse_manifest(text: &str) -> Result<Vec<Package>, String> {
     Ok(packages)
 }
 
-/// Where a package's files go, relative to the version folder. A package this table does not
-/// know is unpacked into the version folder itself (what Roblox's own installer falls back to).
-fn package_dir(name: &str) -> &'static str {
-    match name {
-        "RobloxApp.zip" | "WebView2.zip" => "",
+/// Where a package's files go, relative to the version folder: the table is Roblox's own (the
+/// one Bloxstrap carries, checked against its PackageMap.cs). A package this table does not know
+/// is placed by its name — `extracontent-<x>.zip` goes to `ExtraContent/<x>`, `content-<x>.zip`
+/// to `content/<x>` — and anything else is unpacked into the version folder itself.
+fn package_dir(name: &str) -> String {
+    let known = match name {
+        "RobloxApp.zip" | "Libraries.zip" | "WebView2.zip" => "",
         "shaders.zip" => "shaders",
         "ssl.zip" => "ssl",
         "WebView2RuntimeInstaller.zip" => "WebView2RuntimeInstaller",
@@ -203,13 +205,24 @@ fn package_dir(name: &str) -> &'static str {
         "content-textures3.zip" => "PlatformContent/pc/textures",
         "content-terrain.zip" => "PlatformContent/pc/terrain",
         "content-platform-fonts.zip" => "PlatformContent/pc/fonts",
-        "extracontent-luua.zip" => "ExtraContent/LuaPackages",
+        "extracontent-luapackages.zip" => "ExtraContent/LuaPackages",
         "extracontent-translations.zip" => "ExtraContent/translations",
         "extracontent-models.zip" => "ExtraContent/models",
         "extracontent-textures.zip" => "ExtraContent/textures",
         "extracontent-places.zip" => "ExtraContent/places",
-        _ => "",
-    }
+        other => {
+            let lower = other.to_ascii_lowercase();
+            let stem = lower.strip_suffix(".zip").unwrap_or(&lower);
+            return if let Some(rest) = stem.strip_prefix("extracontent-") {
+                format!("ExtraContent/{rest}")
+            } else if let Some(rest) = stem.strip_prefix("content-") {
+                format!("content/{rest}")
+            } else {
+                String::new()
+            };
+        }
+    };
+    known.to_string()
 }
 
 // ---------------------------------------------------------------------
@@ -448,11 +461,13 @@ async fn fetch_manifest(client: &reqwest::Client, base: &str, version: &str) -> 
 
 /// The packages to download: the zip files. Older versions also list installer programs
 /// (`RobloxPlayerInstaller.exe`, `RobloxPlayerLauncher.exe`) in their manifest; those are plain
-/// files, not zips, and the player does not need them, so they are left out.
+/// files, not zips, and the player does not need them, so they are left out. So is
+/// `WebView2RuntimeInstaller.zip`: it only matters when Windows has no WebView2 runtime, and Luna
+/// never runs that installer.
 fn playable_packages(packages: Vec<Package>) -> Result<Vec<Package>, String> {
     let zips: Vec<Package> = packages
         .into_iter()
-        .filter(|p| p.name.to_ascii_lowercase().ends_with(".zip"))
+        .filter(|p| p.name.to_ascii_lowercase().ends_with(".zip") && p.name != "WebView2RuntimeInstaller.zip")
         .collect();
     if zips.is_empty() {
         Err("The package manifest has no zip packages".to_string())
@@ -599,6 +614,18 @@ pub(crate) fn verify_install(dir: &Path, deep: bool, skip: &HashSet<String>) -> 
     let mut report = VerifyReport::default();
     for (package, files) in &manifest.packages {
         let mut damaged = false;
+        // Files that were put somewhere other than the package's own folder (an install made
+        // while the package was unknown) are in the wrong place: the package is unpacked again.
+        let prefix = package_dir(package).to_ascii_lowercase();
+        if !prefix.is_empty() {
+            for file in files {
+                if !file.p.to_ascii_lowercase().starts_with(&format!("{prefix}/")) {
+                    report.bad_files += 1;
+                    report.bad_paths.push((package.clone(), file.p.clone()));
+                    damaged = true;
+                }
+            }
+        }
         for file in files {
             if skip.contains(&file.p.to_ascii_lowercase()) {
                 report.skipped_mods += 1;
@@ -650,6 +677,20 @@ async fn repair(
         .collect();
     if wanted.is_empty() {
         return Err("Roblox no longer lists the damaged part of this version".to_string());
+    }
+    // files of these packages that lie outside the package's own folder are removed first
+    if let Some(manifest) = read_install_manifest(dir) {
+        for name in names {
+            let prefix = package_dir(name).to_ascii_lowercase();
+            if prefix.is_empty() {
+                continue;
+            }
+            for file in manifest.packages.get(name).into_iter().flatten() {
+                if !file.p.to_ascii_lowercase().starts_with(&format!("{prefix}/")) {
+                    let _ = fs::remove_file(dir.join(&file.p));
+                }
+            }
+        }
     }
     let downloads = luna_versions_dir()?.join(".downloads").join(format!("{version}-repair"));
     let records = run_packages(&client, base, version, wanted, &downloads, dir, emit).await?;
@@ -948,7 +989,9 @@ pub async fn ensure_latest(
     let versions = luna_versions_dir()?;
     fs::create_dir_all(&versions).map_err(|e| e.to_string())?;
     let dir = versions.join(&latest);
-    let updated = !dir.join(PLAYER_EXE).is_file();
+    // An install without a record of its files was made by an early Luna, whose package table
+    // had a mistake (the Lua UI packages went to the wrong folder): it is installed again.
+    let updated = !(dir.join(PLAYER_EXE).is_file() && dir.join(MANIFEST_FILE).is_file());
     if updated {
         install(&client, &channel, &latest, &versions, emit).await?;
     }
@@ -1046,6 +1089,8 @@ mod tests {
         let kept = playable_packages(parse_manifest(text).unwrap()).unwrap();
         let names: Vec<&str> = kept.iter().map(|p| p.name.as_str()).collect();
         assert_eq!(names, vec!["RobloxApp.zip", "content-sky.zip"]);
+        let with_runtime = parse_manifest("v0\nWebView2RuntimeInstaller.zip\n1\n2\n3\nRobloxApp.zip\n4\n5\n6\n").unwrap();
+        assert_eq!(playable_packages(with_runtime).unwrap().len(), 1);
         assert!(playable_packages(parse_manifest("v0\nRobloxPlayerInstaller.exe\n0123\n10\n20\n").unwrap()).is_err());
     }
 
@@ -1111,6 +1156,22 @@ mod tests {
         forget_files(&dir, &still.bad_paths);
         assert!(verify_install(&dir, false, &modded).bad_packages.is_empty());
 
+        // files that sit outside the package's own folder (installed under a wrong table) are flagged
+        let mut packages = BTreeMap::new();
+        packages.insert(
+            "extracontent-luapackages.zip".to_string(),
+            vec![FileRecord { p: "Packages/Foo.lua".into(), s: 1, h: "x".into() }],
+        );
+        fs::write(
+            dir.join(MANIFEST_FILE),
+            serde_json::to_string(&InstallManifest { version: "version-test".into(), packages }).unwrap(),
+        )
+        .unwrap();
+        fs::create_dir_all(dir.join("Packages")).unwrap();
+        fs::write(dir.join("Packages/Foo.lua"), b"x").unwrap();
+        let misplaced = verify_install(&dir, false, &none);
+        assert_eq!(misplaced.bad_packages, vec!["extracontent-luapackages.zip".to_string()]);
+
         // no record: it can't be judged
         fs::remove_file(dir.join(MANIFEST_FILE)).unwrap();
         assert!(verify_install(&dir, false, &none).unverifiable);
@@ -1124,5 +1185,11 @@ mod tests {
         assert!(version_url(&Some("zintegration".into())).ends_with("/channel/zintegration"));
         assert_eq!(package_dir("content-sky.zip"), "content/sky");
         assert_eq!(package_dir("RobloxApp.zip"), "");
+        // the Lua UI packages (icons, fonts of the new interface): the name that was once misspelled
+        assert_eq!(package_dir("extracontent-luapackages.zip"), "ExtraContent/LuaPackages");
+        // a package nobody listed is placed by its name
+        assert_eq!(package_dir("extracontent-newthing.zip"), "ExtraContent/newthing");
+        assert_eq!(package_dir("content-newthing.zip"), "content/newthing");
+        assert_eq!(package_dir("somethingelse.zip"), "");
     }
 }

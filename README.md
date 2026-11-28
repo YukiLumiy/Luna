@@ -34,7 +34,7 @@ git push origin HEAD --tags   # Actions がビルド・署名・公開
 ```
 tauri.conf.json の updater の endpoints は YukiLumiy/Luna を仮置きしています。
 
-## v0.2.0 〜 v0.2.6 で入ったもの
+## v0.2.0 〜 v0.2.7 で入ったもの
 - ブートストラッパー（src-tauri/src/bootstrap.rs）: 起動のたびに最新版を確認し、足りなければ Roblox の CDN からダウンロード（4並列・MD5検証・3回まで再試行）して `%LOCALAPPDATA%\\Luna\\Versions\\<version>` に展開。`<version>.partial` で作って完成後にリネームするので、`RobloxPlayerBeta.exe` がある版は必ず完全。古い版は Roblox 実行中でなければ削除。オフライン / 取得失敗時はインストール済みの版（なければ従来の `%LOCALAPPDATA%\\Roblox\\Versions`）で起動。Roblox 公式インストーラは使わない
 - 進捗はホーム画面（状態文 + 細いバー、Settings ボタンが Cancel に変わる）。`roblox-player:` リンクで起動した場合もこの窓が出る。`bootstrap-progress` / `launch-started` / `launch-failed` イベントで通知
 - プレイ中はウィンドウを隠す（Settings → Advanced → Hide Luna while playing）。リンクから起動された Luna は Roblox の終了時（キャッシュ処理の完了後）に自動で終了
@@ -48,6 +48,7 @@ tauri.conf.json の updater の endpoints は YukiLumiy/Luna を仮置きして�
 - v0.2.4: 一覧にないバージョンの手入力（`set_roblox_pin` が CDN に存在確認）。Roblox の窓の名前とアイコン（winbrand.rs: Win32 の EnumWindows / SendMessageTimeoutW / CreateIcon を直接宣言。タイトルが "Roblox" か "Luna : " で始まる窓だけ触り、1秒ごとに確認。名前は activity.rs の `set_game` で「Luna : ゲーム名」に。設定 `brand_roblox_window`）
 - v0.2.5: Settings → Roblox の先頭に「使用中のバージョン」カード（`list_roblox_versions` が `current` を返す。一覧外の古い版でも番号と日付を出す）。ファイル検査で、再ダウンロードしても差が残るファイルは記録から外し、起動を止めない（`still_differs` / `forget_files`）
 - v0.2.6: 選択したバージョンのカード（固定した版はダウンロード前でも番号・日付を表示。`list_roblox_versions` が `selected` を返す）、Reinstall Roblox を最下部の独立パネルに（MaintenanceSection.tsx）、スクロール領域の端のフェード（patchnote / バージョン一覧 / 最近のゲーム）
+- v0.2.7: パッケージ表の綴り間違い（`extracontent-luapackages.zip` を `extracontent-luua.zip` と書いていた）で Lua UI パッケージが root に展開され、Roblox の UI のアイコンが文字名のまま表示された。表は Bloxstrap の PackageMap.cs と照合済み。未知のパッケージは名前から配置先を推定（`extracontent-x` → `ExtraContent/x`、`content-x` → `content/x`）。既存のインストールは、記録したパスがパッケージの場所の外にあれば検査で壊れ扱いにして再展開、記録の無い古いインストールは入れ直し。`RobloxPlayerInstaller.exe` などの zip 以外と `WebView2RuntimeInstaller.zip` はダウンロードしない
 
 ## 次のステップ
 - Windows 実機での動作確認（ブートストラッパーの実ダウンロード、右下カード、ウィンドウの隠れ方）
