@@ -1009,6 +1009,12 @@
 @keyframes modal-out { to { opacity: 0; translate: 0 12px; scale: 0.97; } }
 @keyframes modal-in { from { opacity: 0; translate: 0 12px; scale: 0.97; } }
 .modal-title { margin: 0; font-family: var(--font-display); font-size: 15px; font-weight: 800; }
+.modal-body {
+  /* what has scrolled away fades out at both ends, like the skybox templates, instead of being cut off */
+  padding: 12px 4px 18px 0;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 12px, #000 calc(100% - 18px), transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 12px, #000 calc(100% - 18px), transparent 100%);
+}
 .modal-body { overflow-y: auto; min-height: 0; font-size: 12.5px; line-height: 1.55; color: var(--ink-muted); scrollbar-width: thin; }
 .modal-body h4 { margin: 10px 0 4px; font-size: 12.5px; color: var(--ink); }
 .modal-body p { margin: 0 0 8px; }
@@ -1118,7 +1124,7 @@
 @keyframes server-pulse { to { box-shadow: 0 0 0 7px rgba(74, 222, 128, 0); } }
 
 /* The recent games scroll instead of making the page longer and longer. */
-.server-recent-list { max-height: 228px; overflow-y: auto; margin: 0 -6px 0 0; padding-right: 6px; overscroll-behavior: contain; }
+.server-recent-list { max-height: 236px; overflow-y: auto; margin: 0 -6px 0 0; padding: 8px 6px 14px 0; -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 8px, #000 calc(100% - 14px), transparent 100%); mask-image: linear-gradient(to bottom, transparent 0, #000 8px, #000 calc(100% - 14px), transparent 100%); overscroll-behavior: contain; }
 .server-clear-label { margin: 12px 0 6px; }
 .server-clear { display: flex; gap: 6px; }
 .server-clear-btn {
@@ -1130,7 +1136,7 @@
 .server-clear-btn--armed, .server-clear-btn--armed:hover { color: var(--danger); border-color: var(--danger); }
 
 /* ---- RobloxSection.tsx ---- */
-.version-list { max-height: 228px; overflow-y: auto; margin: 10px 0; padding-right: 4px; display: flex; flex-direction: column; gap: 4px; overscroll-behavior: contain; }
+.version-list { max-height: 236px; overflow-y: auto; margin: 6px 0 4px; padding: 10px 4px 16px 2px; -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 10px, #000 calc(100% - 16px), transparent 100%); mask-image: linear-gradient(to bottom, transparent 0, #000 10px, #000 calc(100% - 16px), transparent 100%); display: flex; flex-direction: column; gap: 4px; overscroll-behavior: contain; }
 .version-row {
   display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; padding: 8px 12px;
   text-align: left; color: var(--ink); background: var(--bg-canvas); border: 1px solid var(--line); border-radius: 12px;

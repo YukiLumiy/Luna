@@ -34,7 +34,7 @@ git push origin HEAD --tags   # Actions がビルド・署名・公開
 ```
 tauri.conf.json の updater の endpoints は YukiLumiy/Luna を仮置きしています。
 
-## v0.2.0 〜 v0.2.5 で入ったもの
+## v0.2.0 〜 v0.2.6 で入ったもの
 - ブートストラッパー（src-tauri/src/bootstrap.rs）: 起動のたびに最新版を確認し、足りなければ Roblox の CDN からダウンロード（4並列・MD5検証・3回まで再試行）して `%LOCALAPPDATA%\\Luna\\Versions\\<version>` に展開。`<version>.partial` で作って完成後にリネームするので、`RobloxPlayerBeta.exe` がある版は必ず完全。古い版は Roblox 実行中でなければ削除。オフライン / 取得失敗時はインストール済みの版（なければ従来の `%LOCALAPPDATA%\\Roblox\\Versions`）で起動。Roblox 公式インストーラは使わない
 - 進捗はホーム画面（状態文 + 細いバー、Settings ボタンが Cancel に変わる）。`roblox-player:` リンクで起動した場合もこの窓が出る。`bootstrap-progress` / `launch-started` / `launch-failed` イベントで通知
 - プレイ中はウィンドウを隠す（Settings → Advanced → Hide Luna while playing）。リンクから起動された Luna は Roblox の終了時（キャッシュ処理の完了後）に自動で終了
@@ -47,6 +47,7 @@ tauri.conf.json の updater の endpoints は YukiLumiy/Luna を仮置きして�
 - v0.2.3: Settings → Roblox。バージョンの固定（`pinned_roblox_version`。一覧は setup.rbxcdn.com の DeployHistory.txt から最新40件。固定中は更新せず、その版が無ければ他の版で代用せずエラー）と、起動前のファイル検査（インストール時に各パッケージが書いたファイルのサイズと MD5 を `luna-manifest.json` に記録。通常は存在とサイズ、「Thorough check」は MD5 まで比較。壊れたパッケージだけ再ダウンロード。モッドが置き換えたファイル（mods の active_paths）は除外）。0.2.2 以前の Luna が入れた Roblox は記録が無いので検査できず、Reinstall Roblox が必要
 - v0.2.4: 一覧にないバージョンの手入力（`set_roblox_pin` が CDN に存在確認）。Roblox の窓の名前とアイコン（winbrand.rs: Win32 の EnumWindows / SendMessageTimeoutW / CreateIcon を直接宣言。タイトルが "Roblox" か "Luna : " で始まる窓だけ触り、1秒ごとに確認。名前は activity.rs の `set_game` で「Luna : ゲーム名」に。設定 `brand_roblox_window`）
 - v0.2.5: Settings → Roblox の先頭に「使用中のバージョン」カード（`list_roblox_versions` が `current` を返す。一覧外の古い版でも番号と日付を出す）。ファイル検査で、再ダウンロードしても差が残るファイルは記録から外し、起動を止めない（`still_differs` / `forget_files`）
+- v0.2.6: 選択したバージョンのカード（固定した版はダウンロード前でも番号・日付を表示。`list_roblox_versions` が `selected` を返す）、Reinstall Roblox を最下部の独立パネルに（MaintenanceSection.tsx）、スクロール領域の端のフェード（patchnote / バージョン一覧 / 最近のゲーム）
 
 ## 次のステップ
 - Windows 実機での動作確認（ブートストラッパーの実ダウンロード、右下カード、ウィンドウの隠れ方）

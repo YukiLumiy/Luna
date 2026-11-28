@@ -749,6 +749,8 @@ pub struct RobloxVersionList {
     versions: Vec<RobloxVersion>,
     /// The version in use, even when it is older than the list reaches.
     current: Option<RobloxVersion>,
+    /// The version that was selected (pinned), even when it is older than the list reaches.
+    selected: Option<RobloxVersion>,
 }
 
 /// The Windows player releases listed in Roblox's DeployHistory.txt, oldest first.
@@ -779,7 +781,9 @@ fn parse_deploy_history(text: &str) -> Vec<RobloxVersion> {
 /// Settings -> Roblox -> versions: the latest releases, newest first.
 #[tauri::command]
 pub async fn list_roblox_versions() -> Result<RobloxVersionList, String> {
-    let channel = normalize_channel(crate::settings::get_settings().ok().and_then(|s| s.release_channel).as_deref());
+    let settings = crate::settings::get_settings().ok();
+    let channel = normalize_channel(settings.as_ref().and_then(|s| s.release_channel.clone()).as_deref());
+    let pinned = settings.and_then(|s| s.pinned_roblox_version);
     let client = reqwest::Client::builder()
         .user_agent("Luna")
         .timeout(Duration::from_secs(30))
@@ -803,12 +807,13 @@ pub async fn list_roblox_versions() -> Result<RobloxVersionList, String> {
         v.in_use = in_use.as_deref() == Some(v.version.as_str());
     }
     let current = all.iter().find(|v| v.in_use).cloned();
+    let selected = pinned.and_then(|p| all.iter().find(|v| v.version == p).cloned());
     all.reverse();
     all.truncate(40);
     if all.is_empty() {
         return Err("Roblox's release list had no versions in it".to_string());
     }
-    Ok(RobloxVersionList { versions: all, current })
+    Ok(RobloxVersionList { versions: all, current, selected })
 }
 
 /// What was typed or chosen as a version: `version-b7e22355` as it is, or just the hash.

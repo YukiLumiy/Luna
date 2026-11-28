@@ -11,6 +11,7 @@ import { FFlagProfilesSection } from "./FFlagProfilesSection";
 import { ServerSection } from "./ServerSection";
 import { RobloxSection } from "./RobloxSection";
 import { AdvancedSection } from "./AdvancedSection";
+import { MaintenanceSection } from "./MaintenanceSection";
 import { useArmed } from "../useArmed";
 import { useOutsideDismiss } from "../useOutsideDismiss";
 
@@ -143,6 +144,7 @@ export function SettingsScreen({ onBack, onProfilesChanged }: SettingsScreenProp
       <RobloxSection />
       <ServerSection />
       <AdvancedSection />
+      <MaintenanceSection />
 
       <div className="profiles-heading-row">
         <h3 className="section-label">{t("profiles.heading")}</h3>

@@ -17,6 +17,7 @@ interface RobloxVersion {
 interface VersionList {
   versions: RobloxVersion[];
   current: RobloxVersion | null;
+  selected: RobloxVersion | null;
 }
 
 interface VerifyOutcome {
@@ -74,6 +75,10 @@ export function RobloxSection() {
   const versions = list?.versions ?? null;
   const newest = versions?.[0] ?? null;
   const current = list?.current ?? null;
+  const selected = list?.selected ?? null;
+  // What is selected: the pinned version, or "the newest" (whatever the list says that is).
+  const target = pinned ?? newest?.version ?? null;
+  const onThisPc = target !== null && installed === target;
 
   async function loadInstalled() {
     try {
@@ -156,20 +161,35 @@ export function RobloxSection() {
     <section className="appearance-block">
       <h3>{t("roblox.heading")}</h3>
 
-      <div className={`server-card version-card ${installed ? "server-card--live" : ""}`}>
-        <span className="server-card-head">{t("roblox.inUse")}</span>
+      <div className={`server-card version-card ${onThisPc ? "server-card--live" : ""}`}>
+        <span className="server-card-head">{t("roblox.selected")}</span>
         <strong className="version-card-number">
-          {installed === undefined ? "…" : installed ? (current?.file_version ?? installed) : t("roblox.notInstalled")}
+          {pinned ? (selected?.file_version ?? pinned) : t("roblox.selectedNewest")}
         </strong>
-        {installed && <span className="server-meta">{[installed, current?.date].filter(Boolean).join(" · ")}</span>}
+        <span className="server-meta">
+          {pinned
+            ? [pinned, selected?.date].filter(Boolean).join(" · ")
+            : newest
+              ? [newest.file_version, newest.date].join(" · ")
+              : ""}
+        </span>
         <div className="server-chips">
           <span className={`server-chip ${pinned ? "server-chip--ok" : "server-chip--good"}`}>
             {pinned ? t("roblox.chipPinned") : t("roblox.chipAuto")}
           </span>
-          {newest && installed === newest.version && <span className="server-chip">{t("roblox.tagNewest")}</span>}
+          {target !== null && installed !== undefined && (
+            <span className={`server-chip ${onThisPc ? "server-chip--good" : "server-chip--dim"}`}>
+              {onThisPc ? t("roblox.chipOnPc") : t("roblox.chipNotYet")}
+            </span>
+          )}
+          {newest && target === newest.version && <span className="server-chip">{t("roblox.tagNewest")}</span>}
         </div>
+        {installed && installed !== target && (
+          <span className="server-meta">{t("roblox.installedNow", { v: current?.file_version ?? installed })}</span>
+        )}
         {note && <p className="appearance-hint version-card-note">{note}</p>}
       </div>
+      <h4 className="sky-mine-title">{t("roblox.selectHeading")}</h4>
       <p className="appearance-hint">{t("roblox.versionHint")}</p>
 
       <div className="appearance-row">
